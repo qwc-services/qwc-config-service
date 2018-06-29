@@ -1,6 +1,3 @@
-import os
-import sys
-
 from flask import Flask, request
 from flask_restplus import Api, Resource, fields
 

@@ -1,4 +1,5 @@
 from ogc_service_permission import OGCServicePermission
+from qwc2_viewer_permission import QWC2ViewerPermission
 
 
 class ConfigService:
@@ -14,8 +15,10 @@ class ConfigService:
         """
         self.logger = logger
 
+        ogc_permission_handler = OGCServicePermission(logger)
         self.permission_handlers = {
-            'ogc': OGCServicePermission(logger)
+            'ogc': ogc_permission_handler,
+            'qwc': QWC2ViewerPermission(ogc_permission_handler, logger)
         }
 
     def service_permissions(self, service, params, username):

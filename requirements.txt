@@ -1,4 +1,4 @@
 Flask==0.12.2
 flask-restplus
 requests
-git+git://github.com/qwc-services/qwc-services-core.git#egg=qwc-services-core
+git+https://github.com/qwc-services/qwc-services-core.git#egg=qwc-services-core
