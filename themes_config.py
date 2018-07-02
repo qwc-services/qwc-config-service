@@ -20,10 +20,15 @@ except:
 from xml.dom.minidom import parseString
 import json
 import traceback
-import socket
 import re
 
-hostFqdn = os.environ.get('QGIS_SERVER_URL', "http://" + socket.getfqdn())
+from werkzeug.urls import url_parse
+
+
+# get internal QGIS server URL from ENV
+qgis_server_url = os.environ.get('QGIS_SERVER_URL',
+                                 'http://localhost:8001/ows/')
+qgis_server_base_path = url_parse(qgis_server_url).path
 qwc2_path = os.environ.get("QWC2_PATH", "qwc2/")
 themesConfig = os.environ.get("QWC2_THEMES_CONFIG", "themesConfig.json")
 usedThemeIds = []
@@ -37,7 +42,7 @@ def getThumbnail(configItem, resultItem, layers, crs, extent):
     print("Using WMS GetMap to generate thumbnail for " + configItem["url"])
 
     # WMS GetMap request
-    url = urljoin(hostFqdn, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/png&STYLES=&WIDTH=200&HEIGHT=100&CRS=" + crs
+    url = urljoin(qgis_server_url, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/png&STYLES=&WIDTH=200&HEIGHT=100&CRS=" + crs
     bboxw = extent[2] - extent[0]
     bboxh = extent[3] - extent[1]
     bboxcx = 0.5 * (extent[0] + extent[2])
@@ -97,9 +102,12 @@ def urlPath(url):
 
 
 def wmsName(url):
-    # we assume last part of URL path
-    parts = urlsplit(url)
-    return os.path.basename(parts.path)
+    # get WMS name as relative path to QGIS server base path
+    wms_name = url_parse(url).path
+    if wms_name.startswith(qgis_server_base_path):
+        wms_name = wms_name[len(qgis_server_base_path):]
+
+    return wms_name
 
 
 def getChildElement(parent, path):
@@ -221,7 +229,7 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
 
 # parse GetCapabilities for theme
 def getTheme(config, permissions, configItem, resultItem):
-    url = urljoin(hostFqdn, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetProjectSettings"
+    url = urljoin(qgis_server_url, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetProjectSettings"
 
     try:
         project_permissions = permissions.get(wmsName(configItem["url"]))

@@ -35,6 +35,11 @@ class QWC2ViewerPermission():
         with open(themes_config, encoding='utf-8') as fh:
             config = json.load(fh)
 
+        # get internal QGIS server URL from ENV
+        qgis_server_url = os.environ.get('QGIS_SERVER_URL',
+                                         'http://localhost:8001/ows/')
+        qgis_server_base_path = url_parse(qgis_server_url).path
+
         # query WMS permissions for each theme
         # TODO: theme groups
         permissions = {}
@@ -42,9 +47,10 @@ class QWC2ViewerPermission():
         for item in theme_items:
             url = item.get('url')
             if url:
-                # get WMS name as last part of item URL path
-                parts = url_parse(url)
-                wms_name = os.path.basename(parts.path)
+                # get WMS name as relative path to QGIS server base path
+                wms_name = url_parse(url).path
+                if wms_name.startswith(qgis_server_base_path):
+                    wms_name = wms_name[len(qgis_server_base_path):]
 
                 # query WMS permissions
                 ogc_params = {'ows_type': 'WMS', 'ows_name': wms_name}
