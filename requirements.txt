@@ -1,4 +1,6 @@
 Flask==0.12.2
 flask-restplus
+psycopg2
 requests
+git+https://github.com/qwc-services/qwc-config-db.git#egg=qwc-config-db
 git+https://github.com/qwc-services/qwc-services-core.git#egg=qwc-services-core

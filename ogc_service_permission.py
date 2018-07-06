@@ -4,27 +4,31 @@ from xml.etree import ElementTree
 
 from flask import json
 import requests
+from sqlalchemy.orm import aliased
+
+from permission_query import PermissionQuery
 
 
-class OGCServicePermission():
+class OGCServicePermission(PermissionQuery):
     """OGCServicePermission class
 
     Query permissions for an OGC service.
     """
 
-    def __init__(self, logger):
+    def __init__(self, config_models, logger):
         """Constructor
 
+        :param ConfigModels config_models: Helper for ORM models
         :param Logger logger: Application logger
         """
-        self.logger = logger
+        super(OGCServicePermission, self).__init__(config_models, logger)
 
         # get internal QGIS server URL from ENV
         # (default: local qgis-server container)
         self.qgis_server_url = os.environ.get('QGIS_SERVER_URL',
                                               'http://localhost:8001/ows/')
 
-    def permissions(self, params, username):
+    def permissions(self, params, username, session):
         """Query permissions for OGC service.
 
         Return OGC service permissions if available and permitted.
@@ -32,6 +36,7 @@ class OGCServicePermission():
         :param obj params: Request parameters with
                            ows_name=<OWS service name>&ows_type=<OWS type>
         :param str username: User name
+        :param Session session: DB session
         """
         permissions = {}
 
@@ -45,7 +50,11 @@ class OGCServicePermission():
         # get complete OGC service permissions from GetProjectSettings
         permissions = self.parseProjectSettings(ows_name, ows_type)
 
-        # TODO: filter restricted resources
+        if permissions:
+            # filter by restricted resources
+            permissions = self.filter_restricted_resources(
+                ows_name, permissions, username, session
+            )
 
         return permissions
 
@@ -163,3 +172,130 @@ class OGCServicePermission():
             attributes.append('geometry')
 
         permissions['layers'][layer_name] = attributes
+
+    def filter_restricted_resources(self, ows_name, permissions, username,
+                                    session):
+        """Filter restricted resources from OGC service permissions.
+
+        Return filtered OGC service permissions.
+
+        :param str ows_name: Map name
+        :param obj permissions: OGC service permissions
+        :param str username: User name
+        :param Session session: DB session
+        """
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
+
+        # query map restrictions
+        maps_query = self.resource_restrictions_query(
+                'map', username, session
+            ).filter(Resource.type == 'map').filter(Resource.name == ows_name)
+
+        if maps_query.count() > 0:
+            # map not permitted
+            return {}
+
+        # query map permissions
+        map_id = None
+        maps_query = self.user_permissions_query(username, session). \
+            join(Permission.resource).filter(Resource.type == 'map'). \
+            filter(Resource.name == ows_name)
+        for map_permission in maps_query.all():
+            map_id = map_permission.resource.id
+
+        if map_id is None:
+            # map not restricted
+            # NOTE: map without resource record is public by default
+            return permissions
+
+        # query layer restrictions
+        layers_query = self.resource_restrictions_query(
+                'layer', username, session
+            ).filter(Resource.parent_id == map_id)
+
+        # remove restricted layers
+        for layer in layers_query.all():
+            self.filter_restricted_layer(layer.name, permissions)
+
+        # query attribute restrictions
+        layer_alias = aliased(Resource)
+        attrs_query = self.resource_restrictions_query(
+                'attribute', username, session
+            )
+        # join to layer resources
+        attrs_query = attrs_query.join(
+                layer_alias, layer_alias.id == Resource.parent_id
+            )
+        # filter by map
+        attrs_query = attrs_query.filter(layer_alias.parent_id == map_id)
+        # include layer name
+        attrs_query = attrs_query.with_entities(
+                Resource.id, Resource.name, Resource.parent_id,
+                layer_alias.name.label('layer_name')
+            )
+
+        # group restricted attributes by layer
+        layers_attributes = {}
+        for attr in attrs_query.all():
+            if attr.layer_name not in layers_attributes:
+                layers_attributes[attr.layer_name] = []
+            layers_attributes[attr.layer_name].append(attr.name)
+
+        for layer in layers_attributes:
+            # remove restricted attributes from permitted layers
+            if layer in permissions['layers']:
+                layer_attrs = permissions['layers'][layer]
+                for attr in layers_attributes[layer]:
+                    if attr in layer_attrs:
+                        layer_attrs.remove(attr)
+
+        # remove group_layers
+        permissions.pop('group_layers', None)
+
+        return permissions
+
+    def filter_restricted_layer(self, restricted_layer, permissions):
+        """Recursively remove restricted layers.
+
+        :param str restricted_layer: Restricted layer name
+        :param obj permissions: OGC service permissions
+        """
+        # remove restricted layer
+        permissions['layers'].pop(restricted_layer, None)
+        if restricted_layer in permissions['queryable_layers']:
+            permissions['queryable_layers'].remove(restricted_layer)
+        if restricted_layer in permissions['public_layers']:
+            permissions['public_layers'].remove(restricted_layer)
+
+        # remove restricted layer from feature_info_aliases
+        feature_info_alias = None
+        for alias in permissions['feature_info_aliases']:
+            if permissions['feature_info_aliases'][alias] == restricted_layer:
+                feature_info_alias = alias
+                break
+        if feature_info_alias is not None:
+            permissions['feature_info_aliases'].pop(feature_info_alias)
+
+        # update restricted_group_layers
+        restricted_group_layers = permissions['restricted_group_layers']
+        for group_layer in permissions['group_layers']:
+            # find restricted layer in group_layers
+            sub_layers = permissions['group_layers'][group_layer]
+            if restricted_layer in sub_layers:
+                if group_layer not in restricted_group_layers:
+                    # add restricted group if not present
+                    restricted_group_layers[group_layer] = sub_layers.copy()
+
+                # remove restricted layer
+                restricted_group_layers[group_layer].remove(restricted_layer)
+                if not restricted_group_layers[group_layer]:
+                    # remove empty restricted group
+                    restricted_group_layers.pop(group_layer, None)
+
+                    # remove empty group layer
+                    self.filter_restricted_layer(
+                        group_layer, permissions
+                    )
+
+                break

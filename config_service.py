@@ -1,3 +1,5 @@
+from qwc_services_core.database import DatabaseEngine
+from qwc_config_db.config_models import ConfigModels
 from ogc_service_permission import OGCServicePermission
 from qwc2_viewer_permission import QWC2ViewerPermission
 
@@ -14,8 +16,11 @@ class ConfigService:
         :param Logger logger: Application logger
         """
         self.logger = logger
-
-        ogc_permission_handler = OGCServicePermission(logger)
+        self.db_engine = DatabaseEngine()
+        self.config_models = ConfigModels(self.db_engine)
+        ogc_permission_handler = OGCServicePermission(
+            self.config_models, logger
+        )
         self.permission_handlers = {
             'ogc': ogc_permission_handler,
             'qwc': QWC2ViewerPermission(ogc_permission_handler, logger)
@@ -30,10 +35,16 @@ class ConfigService:
         """
         permission_handler = self.permission_handlers.get(service, None)
         if permission_handler is not None:
+            # create session for ConfigDB
+            session = self.config_models.session()
+
             # query permissions
             permissions = permission_handler.permissions(
-                params, username
+                params, username, session
             )
+
+            # close session
+            session.close()
 
             return {
                 'permissions': permissions

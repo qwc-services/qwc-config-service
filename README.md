@@ -47,6 +47,10 @@ Sample requests:
 Development
 -----------
 
+Install Python module for PostgreSQL:
+
+    apt-get install python3-psycopg2
+
 Create a virtual environment:
 
     virtualenv --python=/usr/bin/python3 --system-site-packages .venv
