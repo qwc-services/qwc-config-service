@@ -27,8 +27,25 @@ permissions_response = create_model(api, 'Permissions', [
                                example={'layers': '...'})]
 ])
 
+last_update_response = create_model(api, 'LastUpdate', [
+    ['permissions_updated_at', fields.String(
+        required=True,
+        description='Timestamp of last permissions update',
+        example='2018-07-09 12:00:00'
+    )]
+])
+
 
 # routes
+@api.route('/last_update')
+class LastUpdate(Resource):
+    @api.doc('last_update')
+    @api.marshal_with(last_update_response)
+    def get(self):
+        """Get timestamp of last permissions update"""
+        return config_service.last_update()
+
+
 @api.route('/<service>')
 @api.response(404, 'Service type not found')
 @api.param('service', 'Service type', default='ogc')

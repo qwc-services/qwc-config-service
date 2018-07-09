@@ -4,13 +4,27 @@ QWC Config Service
 Provide service specific permissions and configs for other QWC services.
 
 **Note:** requires a QGIS server running on `$QGIS_SERVER_URL` for
-OGC service permissions
+OGC service permissions and a QWC ConfigDB for permission queries
 
 
 Setup
 -----
 
 The QWC Map Viewer config requires a QWC2 themes config file `themesConfig.json` (see setup of [QWC Map Viewer](https://github.com/qwc-services/qwc-map-viewer)).
+
+Uses PostgreSQL connection service `qwc_configdb` (ConfigDB).
+
+Setup PostgreSQL connection service file `~/.pg_service.conf`:
+
+```
+[qwc_configdb]
+host=localhost
+port=5439
+dbname=qwc_demo
+user=qwc_admin
+password=qwc_admin
+sslmode=disable
+```
 
 
 Configuration

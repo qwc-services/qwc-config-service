@@ -1,5 +1,8 @@
-from qwc_services_core.database import DatabaseEngine
+from datetime import datetime
+import os
+
 from qwc_config_db.config_models import ConfigModels
+from qwc_services_core.database import DatabaseEngine
 from ogc_service_permission import OGCServicePermission
 from qwc2_viewer_permission import QWC2ViewerPermission
 
@@ -24,6 +27,46 @@ class ConfigService:
         self.permission_handlers = {
             'ogc': ogc_permission_handler,
             'qwc': QWC2ViewerPermission(ogc_permission_handler, logger)
+        }
+
+        # get path to QWC2 themes config from ENV
+        qwc2_path = os.environ.get('QWC2_PATH', 'qwc2/')
+        self.themes_config_path = os.environ.get(
+            'QWC2_THEMES_CONFIG', os.path.join(qwc2_path, 'themesConfig.json')
+        )
+
+    def last_update(self):
+        """Return UTC timestamp of last permissions update."""
+        # get modification time of QWC2 themes config file
+        config_updated_at = None
+        if os.path.isfile(self.themes_config_path):
+            config_updated_at = datetime.utcfromtimestamp(
+                os.path.getmtime(self.themes_config_path)
+            )
+
+        # create session for ConfigDB
+        session = self.config_models.session()
+
+        # query timestamp
+        LastUpdate = self.config_models.model('last_update')
+        query = session.query(LastUpdate.updated_at)
+        last_update = query.first()
+        if last_update is not None:
+            if config_updated_at is not None:
+                # use latest of both timestamps
+                updated_at = max(last_update.updated_at, config_updated_at)
+            else:
+                # use timestamp from ConfigDB
+                updated_at = last_update.updated_at
+        else:
+            # no entry in ConfigDB, use config timestamp or now
+            updated_at = config_updated_at or datetime.utcnow()
+
+        # close session
+        session.close()
+
+        return {
+            'permissions_updated_at': updated_at.strftime("%Y-%m-%d %H:%M:%S")
         }
 
     def service_permissions(self, service, params, username):
