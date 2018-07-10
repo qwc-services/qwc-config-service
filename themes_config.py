@@ -134,6 +134,7 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
     name = getChildElementValue(layer, "Name")
     title = getChildElementValue(layer, "Title")
     layers = getDirectChildElements(layer, "Layer")
+    treeName = getChildElementValue(layer, "TreeName")
 
     # print("getLayerTree from root layer '%s' (devel %d) with permisssions %s" % (name, level, permissions))
     if permissions is not None and level > 1 and name not in permissions['public_layers']:
@@ -224,7 +225,7 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
             return
 
     resultLayers.append(layerEntry)
-    titleNameMap[title] = name
+    titleNameMap[treeName] = name
 
 
 # parse GetCapabilities for theme
