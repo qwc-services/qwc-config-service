@@ -26,12 +26,16 @@ password=qwc_admin
 sslmode=disable
 ```
 
+The Data service config requires read access to the corresponding QGIS project files at `QGIS_RESOURCES_PATH`.
+
 
 Configuration
 -------------
 
 Add new themes to your `themesConfig.json` (see [Documentation](https://github.com/qgis/qwc2-demo-app/blob/master/doc/QWC2_Documentation.md#theme-configuration-qgis-projects-and-the-themesconfigjson-file)) and put any theme thumbnails into `qwc2/assets/img/mapthumbs/`.
 The `themesConfig.json` file is used by the Config service to collect the full themes configuration using GetProjectSettings.
+
+Copy any QGIS project files required for the Data service to your `QGIS_RESOURCES_PATH`.
 
 
 Usage
@@ -40,6 +44,8 @@ Usage
 Set the `QGIS_SERVER_URL` environment variable to the QGIS server URL
 when starting this service. (default: `http://localhost:8001/ows/` on
 qwc-qgis-server container)
+
+Set the `QGIS_RESOURCES_PATH` environment variable to your QGIS project files path.
 
 Set the `QWC2_PATH` environment variable to your QWC2 files path.
 Set the `QWC2_THEMES_CONFIG` environment variable to your QWC2 `themesConfig.json` path if it is not located in `$QWC2_PATH`.
@@ -55,6 +61,7 @@ Service API:
 Sample requests:
 
     curl 'http://localhost:5010/ogc?ows_type=WMS&ows_name=qwc_demo'
+    curl 'http://localhost:5010/data?dataset=qwc_demo.edit_points'
     curl 'http://localhost:5010/qwc'
 
 
@@ -83,4 +90,4 @@ Install requirements:
 
 Start local service:
 
-    QGIS_SERVER_URL=http://localhost:8001/ows/ QWC2_PATH=qwc2/ python server.py
+    QGIS_SERVER_URL=http://localhost:8001/ows/ QGIS_RESOURCES_PATH=qgs/ QWC2_PATH=qwc2/ python server.py

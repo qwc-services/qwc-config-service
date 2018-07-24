@@ -3,6 +3,7 @@ import os
 
 from qwc_config_db.config_models import ConfigModels
 from qwc_services_core.database import DatabaseEngine
+from data_service_permission import DataServicePermission
 from ogc_service_permission import OGCServicePermission
 from qwc2_viewer_permission import QWC2ViewerPermission
 
@@ -25,6 +26,7 @@ class ConfigService:
             self.config_models, logger
         )
         self.permission_handlers = {
+            'data': DataServicePermission(self.config_models, logger),
             'ogc': ogc_permission_handler,
             'qwc': QWC2ViewerPermission(ogc_permission_handler, logger)
         }

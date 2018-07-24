@@ -48,10 +48,12 @@ class LastUpdate(Resource):
 
 @api.route('/<service>')
 @api.response(404, 'Service type not found')
-@api.param('service', 'Service type', default='ogc')
+@api.param('service', 'Service type (<i>ogc</i>, <i>data</i>, <i>qwc</i>)',
+           default='ogc')
 @api.param('username', 'User name')
 @api.param('ows_name', 'WMS/WFS name', default='qwc_demo')
-@api.param('ows_type', 'OWS type (WMS or WFS', default='WMS')
+@api.param('ows_type', 'OWS type (<i>WMS</i> or <i>WFS</i>)', default='WMS')
+@api.param('dataset', 'Dataset ID', default='qwc_demo.edit_points')
 class ServicePermissions(Resource):
     @api.doc('permissions')
     @api.marshal_with(permissions_response)
@@ -65,6 +67,7 @@ class ServicePermissions(Resource):
 
         * <b>ows_name</b>: OGC and FeatureInfo services
         * <b>ows_type</b>: OGC service
+        * <b>dataset</b>: Data service
         """
         username = request.args.get('username', None)
         result = config_service.service_permissions(
