@@ -22,13 +22,20 @@ class ConfigService:
         self.logger = logger
         self.db_engine = DatabaseEngine()
         self.config_models = ConfigModels(self.db_engine)
+        data_permission_handler = DataServicePermission(
+            self.config_models, logger
+        )
         ogc_permission_handler = OGCServicePermission(
             self.config_models, logger
         )
+        qwc_permission_handler = QWC2ViewerPermission(
+            ogc_permission_handler, data_permission_handler,
+            self.config_models, logger
+        )
         self.permission_handlers = {
-            'data': DataServicePermission(self.config_models, logger),
+            'data': data_permission_handler,
             'ogc': ogc_permission_handler,
-            'qwc': QWC2ViewerPermission(ogc_permission_handler, logger)
+            'qwc': qwc_permission_handler
         }
 
         # get path to QWC2 themes config from ENV

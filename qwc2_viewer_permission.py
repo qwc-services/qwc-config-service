@@ -12,14 +12,30 @@ class QWC2ViewerPermission(PermissionQuery):
     Query permissions for a QWC service.
     '''
 
-    def __init__(self, ogc_permission_handler, logger):
+    # lookup for edit geometry types:
+    #     PostGIS geometry type -> QWC2 edit geometry type
+    EDIT_GEOM_TYPES = {
+        'POINT': 'Point',
+        'MULTIPOINT': 'Point',
+        'LINESTRING': 'LineString',
+        'MULTILINESTRING': 'LineString',
+        'POLYGON': 'Polygon',
+        'MULTIPOLYGON': 'Polygon'
+    }
+
+    def __init__(self, ogc_permission_handler, data_permission_handler,
+                 config_models, logger):
         """Constructor
 
-        :param ogc_permission_handler: Permission handler for WMS requests
+        :param ogc_permission_handler: Permission handler for OGC service
+        :param data_permission_handler: Permission handler for Data service
+        :param ConfigModels config_models: Helper for ORM models
         :param Logger logger: Application logger
         """
+        super(QWC2ViewerPermission, self).__init__(config_models, logger)
+
         self.ogc_permission_handler = ogc_permission_handler
-        self.logger = logger
+        self.data_permission_handler = data_permission_handler
 
         # get path to QWC2 themes config from ENV
         qwc2_path = os.environ.get('QWC2_PATH', 'qwc2/')
@@ -55,10 +71,11 @@ class QWC2ViewerPermission(PermissionQuery):
 
     def themes_group_permissions(self, group_config, permissions, username,
                                  session):
-        """Recursively collect query WMS permissions for each theme in a group.
+        """Recursively collect WMS and edit permissions for each theme in a
+        group.
 
         :param obj group_config: Sub config for theme group
-        :param obj permissions: Collected WMS permissions
+        :param obj permissions: Collected WMS and edit permissions
         :param str username: User name
         :param Session session: DB session
         """
@@ -77,7 +94,112 @@ class QWC2ViewerPermission(PermissionQuery):
                     ogc_params, username, session
                 )
 
+                if permissions[wms_name]:
+                    # query edit permissions
+                    edit_config = self.edit_permissions(
+                        wms_name, username, session
+                    )
+                    if edit_config:
+                        permissions[wms_name]['edit_config'] = edit_config
+
         groups = group_config.get('groups', [])
         for group in groups:
             # collect sub group permissions
             self.themes_group_permissions(group, permissions, username)
+
+    def edit_permissions(self, map_name, username, session):
+        """Query edit permissions for a theme.
+
+        :param str map_name: Map name (matches WMS and QGIS project)
+        :param str username: User name
+        :param Session session: DB session
+        """
+        edit_config = {}
+
+        edit_datasets = self.edit_datasets(map_name, username, session)
+        for dataset in edit_datasets:
+            edit_layer_config = self.edit_layer_config(
+                map_name, dataset, username, session
+            )
+            if edit_layer_config:
+                edit_config[dataset] = edit_layer_config
+
+        return edit_config
+
+    def edit_datasets(self, map_name, username, session):
+        """Get permitted edit datasets for a map.
+
+        :param str map_name: Map name
+        :param str username: User name
+        :param Session session: DB session
+        """
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
+
+        # query map permissions
+        maps_query = self.user_permissions_query(username, session). \
+            join(Permission.resource).filter(Resource.type == 'map'). \
+            filter(Resource.name == map_name). \
+            distinct(Resource.name)
+        for map_permission in maps_query.all():
+            map_id = map_permission.resource.id
+
+        if map_id is None:
+            # map not found or not permitted
+            return []
+
+        # query writable data permissions
+        edit_datasets = []
+        data_query = self.user_permissions_query(username, session). \
+            join(Permission.resource).filter(Resource.type == 'data'). \
+            filter(Permission.write). \
+            filter(Resource.parent_id == map_id)
+        for data_permission in data_query.all():
+            edit_datasets.append(data_permission.resource.name)
+
+        return edit_datasets
+
+    def edit_layer_config(self, map_name, layer_name, username, session):
+        """Get permitted edit config for a dataset.
+
+        :param str map_name: Map name
+        :param str layer_name: Data layer name
+        :param str username: User name
+        :param Session session: DB session
+        """
+        dataset = "%s.%s" % (map_name, layer_name)
+
+        # query data permissions
+        data_params = {'dataset': dataset}
+        permissions = self.data_permission_handler.permissions(
+            data_params, username, session
+        )
+
+        if permissions['geometry_type'] not in self.EDIT_GEOM_TYPES:
+            # unsupported geometry type
+            table = "%s.%s" % (
+                permissions.get('schema'), permissions.get('table_name')
+            )
+            self.logger.warn(
+                "Unsupported geometry type '%s' for edit dataset '%s' "
+                "on table '%s'" %
+                (permissions['geometry_type'], dataset, table)
+            )
+            return {}
+
+        fields = []
+        for attr in permissions['attributes']:
+            fields.append({
+                'id': attr,
+                'name': attr,
+                'type': 'text'
+            })
+
+        geometry_type = self.EDIT_GEOM_TYPES.get(permissions['geometry_type'])
+
+        return {
+            'layerName': layer_name,
+            'editDataset': dataset,
+            'fields': fields,
+            'geomType': geometry_type
+        }

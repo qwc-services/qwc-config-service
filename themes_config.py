@@ -394,8 +394,12 @@ def getTheme(config, permissions, configItem, resultItem):
         if "skipEmptyFeatureAttributes" in configItem:
             resultItem["skipEmptyFeatureAttributes"] = configItem["skipEmptyFeatureAttributes"]
 
-        resultItem["editConfig"] = getEditConfig(configItem["editConfig"] if "editConfig" in configItem else None);
-        # TODO: apply edit permissions
+        if project_permissions.get('edit_config'):
+            # edit config from permissions
+            resultItem["editConfig"] = project_permissions.get('edit_config')
+        else:
+            # get edit config from referenced JSON
+            resultItem["editConfig"] = getEditConfig(configItem["editConfig"] if "editConfig" in configItem else None);
 
         # set default theme
         if "default" in configItem or not result["themes"]["defaultTheme"]:
