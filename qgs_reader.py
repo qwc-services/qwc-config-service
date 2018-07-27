@@ -164,7 +164,7 @@ class QGSReader:
     def attributes_metadata(self, maplayer):
         """Collect layer attributes.
 
-        :param Element maplayer: QGS mayplayer node
+        :param Element maplayer: QGS maplayer node
         """
         attributes = []
         fields = {}
@@ -172,8 +172,13 @@ class QGSReader:
         aliases = maplayer.find('aliases')
         for alias in aliases.findall('alias'):
             field = alias.get('field')
-            attributes.append(field)
+            edittype = maplayer.find("edittypes/edittype[@name='%s']" % field)
 
+            if edittype.get('widgetv2type') == 'Hidden':
+                # skip hidden fields
+                continue
+
+            attributes.append(field)
             fields[field] = {}
 
             # get alias
@@ -181,7 +186,49 @@ class QGSReader:
             if name:
                 fields[field]['alias'] = name
 
+            # get any constraints from edit widgets
+            constraints = self.edit_widget_constraints(edittype)
+            if constraints:
+                fields[field]['constraints'] = constraints
+
         return {
             'attributes': attributes,
             'fields': fields
         }
+
+    def edit_widget_constraints(self, edittype):
+        """Get any constraints from edit widget config.
+
+        :param Element edittype: QGS edittype node
+        """
+        constraints = {}
+
+        widget_config = edittype.find('widgetv2config')
+        if widget_config.get('fieldEditable') == '0':
+            constraints['readonly'] = True
+
+        if widget_config.get('notNull') == '1':
+            constraints['required'] = True
+
+        constraint_desc = widget_config.get('constraintDescription', '')
+        if len(constraint_desc) > 0:
+            constraints['placeholder'] = constraint_desc
+
+        if edittype.get('widgetv2type') == 'Range':
+            constraints.update({
+                'min': widget_config.get('Min'),
+                'max': widget_config.get('Max'),
+                'step': widget_config.get('Step'),
+            })
+        elif edittype.get('widgetv2type') == 'ValueMap':
+            values = []
+            for value in widget_config.findall('value'):
+                values.append({
+                    'label': value.get('key'),
+                    'value': value.get('value')
+                })
+
+            if values:
+                constraints['values'] = values
+
+        return constraints

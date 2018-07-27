@@ -237,6 +237,12 @@ class DataServicePermission(PermissionQuery):
                     )
 
                 if constraints:
+                    if 'constraints' in permissions['fields'][attr]:
+                        # merge constraints from QGIS project
+                        constraints.update(
+                            permissions['fields'][attr]['constraints']
+                        )
+
                     # add constraints
                     permissions['fields'][attr]['constraints'] = constraints
 

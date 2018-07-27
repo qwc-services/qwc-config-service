@@ -223,6 +223,8 @@ class QWC2ViewerPermission(PermissionQuery):
             if 'constraints' in field:
                 # add any constraints
                 edit_field['constraints'] = field['constraints']
+                if 'values' in field['constraints']:
+                    edit_field['type'] = 'list'
 
             fields.append(edit_field)
 
