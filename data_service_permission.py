@@ -1,4 +1,5 @@
 from flask import json
+from sqlalchemy.sql import text as sql_text
 
 from permission_query import PermissionQuery
 from qgs_reader import QGSReader
@@ -9,6 +10,17 @@ class DataServicePermission(PermissionQuery):
 
     Query permissions for a data service.
     """
+
+    def __init__(self, db_engine, config_models, logger):
+        """Constructor
+
+        :param DatabaseEngine db_engine: Database engine with DB connections
+        :param ConfigModels config_models: Helper for ORM models
+        :param Logger logger: Application logger
+        """
+        super(DataServicePermission, self).__init__(config_models, logger)
+
+        self.db_engine = db_engine
 
     def permissions(self, params, username, session):
         """Query permissions for editing a dataset.
@@ -54,6 +66,8 @@ class DataServicePermission(PermissionQuery):
                     data_permissions['restricted_attributes'],
                     permissions
                 )
+
+                self.lookup_attribute_data_types(permissions)
 
         return permissions
 
@@ -146,3 +160,91 @@ class DataServicePermission(PermissionQuery):
         for attr in restricted_attributes:
             if attr in permissions['attributes']:
                 permissions['attributes'].remove(attr)
+
+    def lookup_attribute_data_types(self, permissions):
+        """Query column data types and add them to Data service permissions.
+
+        :param obj permissions: Data service permissions
+        """
+        try:
+            connection_string = permissions['database']
+            schema = permissions['schema']
+            table_name = permissions['table_name']
+
+            # connect to GeoDB
+            geo_db = self.db_engine.db_engine(connection_string)
+            conn = geo_db.connect()
+
+            for attr in permissions['attributes']:
+                # build query SQL
+                sql = sql_text("""
+                    SELECT data_type, character_maximum_length,
+                        numeric_precision, numeric_scale
+                    FROM information_schema.columns
+                    WHERE table_schema = '{schema}' AND table_name = '{table}'
+                        AND column_name = '{column}'
+                    ORDER BY ordinal_position;
+                """.format(schema=schema, table=table_name, column=attr))
+
+                # execute query
+                data_type = None
+                constraints = {}
+                result = conn.execute(sql)
+                for row in result:
+                    data_type = row['data_type']
+
+                    # constraints from data type
+                    if (data_type in ['character', 'character varying'] and
+                            row['character_maximum_length']):
+                        constraints = {
+                            'maxlength': row['character_maximum_length']
+                        }
+                    elif data_type in ['double precision', 'real']:
+                        # NOTE: use text field with pattern for floats
+                        constraints['pattern'] = '[0-9]+([\\.,][0-9]+)?'
+                    elif data_type == 'numeric' and row['numeric_precision']:
+                        step = pow(10, -row['numeric_scale'])
+                        max_value = pow(
+                            10, row['numeric_precision'] - row['numeric_scale']
+                        ) - step
+                        constraints = {
+                            'numeric_precision': row['numeric_precision'],
+                            'numeric_scale': row['numeric_scale'],
+                            'min': -max_value,
+                            'max': max_value,
+                            'step': step
+                        }
+                    elif data_type == 'smallint':
+                        constraints = {'min': -32768, 'max': 32767}
+                    elif data_type == 'integer':
+                        constraints = {'min': -2147483648, 'max': 2147483647}
+                    elif data_type == 'bigint':
+                        constraints = {
+                            'min': '-9223372036854775808',
+                            'max': '9223372036854775807'
+                        }
+
+                if attr not in permissions['fields']:
+                    permissions['fields'][attr] = {}
+
+                if data_type:
+                    # add data type
+                    permissions['fields'][attr]['data_type'] = data_type
+                else:
+                    self.logger.warn(
+                        "Could not find data type of column '%s' "
+                        "of table '%s.%s'" % (attr, schema, table_name)
+                    )
+
+                if constraints:
+                    # add constraints
+                    permissions['fields'][attr]['constraints'] = constraints
+
+            # close database connection
+            conn.close()
+
+        except Exception as e:
+            self.logger.error(
+                "Error while querying attribute data types:\n\n%s" % e
+            )
+            raise

@@ -9,7 +9,7 @@ from themes_config import genThemes
 class QWC2ViewerPermission(PermissionQuery):
     '''QWC2ViewerPermission class
 
-    Query permissions for a QWC service.
+    Query permissions for a QWC Map viewer application.
     '''
 
     # lookup for edit geometry types:
@@ -21,6 +21,25 @@ class QWC2ViewerPermission(PermissionQuery):
         'MULTILINESTRING': 'LineString',
         'POLYGON': 'Polygon',
         'MULTIPOLYGON': 'Polygon'
+    }
+
+    # lookup for edit field types:
+    #     PostgreSQL data_type -> QWC2 edit field type
+    EDIT_FIELD_TYPES = {
+        'bigint': 'number',
+        'boolean': 'boolean',
+        'character varying': 'text',
+        'date': 'date',
+        'double precision': 'text',
+        'integer': 'number',
+        'numeric': 'number',
+        'real': 'text',
+        'smallint': 'number',
+        'text': 'text',
+        'time': 'time',
+        'timestamp with time zone': 'date',
+        'timestamp without time zone': 'date',
+        'uuid': 'text'
     }
 
     def __init__(self, ogc_permission_handler, data_permission_handler,
@@ -189,11 +208,23 @@ class QWC2ViewerPermission(PermissionQuery):
 
         fields = []
         for attr in permissions['attributes']:
-            fields.append({
+            field = permissions['fields'].get(attr, {})
+            alias = field.get('alias', attr)
+            data_type = self.EDIT_FIELD_TYPES.get(
+                field.get('data_type'), 'text'
+            )
+
+            edit_field = {
                 'id': attr,
-                'name': attr,
-                'type': 'text'
-            })
+                'name': alias,
+                'type': data_type
+            }
+
+            if 'constraints' in field:
+                # add any constraints
+                edit_field['constraints'] = field['constraints']
+
+            fields.append(edit_field)
 
         geometry_type = self.EDIT_GEOM_TYPES.get(permissions['geometry_type'])
 

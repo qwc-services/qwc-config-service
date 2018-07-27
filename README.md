@@ -4,7 +4,8 @@ QWC Config Service
 Provide service specific permissions and configs for other QWC services.
 
 **Note:** requires a QGIS server running on `$QGIS_SERVER_URL` for
-OGC service permissions and a QWC ConfigDB for permission queries
+OGC service permissions, a QWC ConfigDB for permission queries and 
+a PostGIS database for GeoDB metadata queries
 
 
 Setup
@@ -27,6 +28,20 @@ sslmode=disable
 ```
 
 The Data service config requires read access to the corresponding QGIS project files at `QGIS_RESOURCES_PATH`.
+
+Uses PostgreSQL connection service or connection to a PostGIS database (GeoDB) for data layers from QGIS projects.
+This connection's user requires read access to the PostgreSQL metadata tables.
+
+E.g. for demo QGIS project `qwc_demo.qgs`:
+
+```
+[qwc_geodb]
+host=localhost
+port=5439
+dbname=qwc_demo
+user=qwc_service
+password=qwc_service
+```
 
 
 Configuration

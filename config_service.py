@@ -23,7 +23,7 @@ class ConfigService:
         self.db_engine = DatabaseEngine()
         self.config_models = ConfigModels(self.db_engine)
         data_permission_handler = DataServicePermission(
-            self.config_models, logger
+            self.db_engine, self.config_models, logger
         )
         ogc_permission_handler = OGCServicePermission(
             self.config_models, logger

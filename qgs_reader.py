@@ -174,6 +174,14 @@ class QGSReader:
             field = alias.get('field')
             attributes.append(field)
 
+            fields[field] = {}
+
+            # get alias
+            name = alias.get('name')
+            if name:
+                fields[field]['alias'] = name
+
         return {
-            'attributes': attributes
+            'attributes': attributes,
+            'fields': fields
         }
