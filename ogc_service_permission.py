@@ -131,11 +131,11 @@ class OGCServicePermission(PermissionQuery):
         }
 
         # collect layers from layer tree
-        self.collect_layers(root_layer, permissions, ns, np)
+        self.collect_layers(root_layer, permissions, ns, np, ows_name)
 
         return permissions
 
-    def collect_layers(self, layer, permissions, ns, np):
+    def collect_layers(self, layer, permissions, ns, np, fallback_name = ""):
         """Recursively collect layer info for layer subtree from
         GetProjectSettings.
 
@@ -144,7 +144,11 @@ class OGCServicePermission(PermissionQuery):
         :param obj ns: Namespace dict
         :param str np: Namespace prefix
         """
-        layer_name = layer.find('%sName' % np, ns).text
+        layer_name_tag = layer.find('%sName' % np, ns)
+        if layer_name_tag is not None:
+            layer_name = layer_name_tag.text
+        else:
+            layer_name = fallback_name
 
         permissions['public_layers'].append(layer_name)
         if layer.get('queryable') == '1':
