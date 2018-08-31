@@ -160,6 +160,7 @@ class QWC2ViewerPermission(PermissionQuery):
             join(Permission.resource).filter(Resource.type == 'map'). \
             filter(Resource.name == map_name). \
             distinct(Resource.name)
+        map_id = None
         for map_permission in maps_query.all():
             map_id = map_permission.resource.id
 
