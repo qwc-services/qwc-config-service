@@ -7,7 +7,6 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
-import sys
 try:
     from urllib.request import urlopen
 except:
@@ -21,28 +20,27 @@ from xml.dom.minidom import parseString
 import json
 import traceback
 import re
+import uuid
 
 from werkzeug.urls import url_parse
 
 
 # get internal QGIS server URL from ENV
-qgis_server_url = os.environ.get('QGIS_SERVER_URL',
-                                 'http://localhost:8001/ows/')
-qgis_server_base_path = url_parse(qgis_server_url).path
-qwc2_path = os.environ.get("QWC2_PATH", "qwc2/")
+baseUrl = os.environ.get('QGIS_SERVER_URL', 'http://localhost:8001/ows/')
+qwc2_path = os.environ.get("QWC2_PATH", "qwc2").rstrip("/")
 themesConfig = os.environ.get("QWC2_THEMES_CONFIG", "themesConfig.json")
-usedThemeIds = []
 
 # load thumbnail from file or GetMap
 def getThumbnail(configItem, resultItem, layers, crs, extent):
     if "thumbnail" in configItem:
-        resultItem["thumbnail"] = "img/mapthumbs/" + configItem["thumbnail"]
-        return
+        if os.path.exists(qwc2_path + "/assets/img/mapthumbs/" + configItem["thumbnail"]):
+            resultItem["thumbnail"] = "img/mapthumbs/" + configItem["thumbnail"]
+            return
 
     print("Using WMS GetMap to generate thumbnail for " + configItem["url"])
 
     # WMS GetMap request
-    url = urljoin(qgis_server_url, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/png&STYLES=&WIDTH=200&HEIGHT=100&CRS=" + crs
+    url = urljoin(baseUrl, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/png&STYLES=&WIDTH=200&HEIGHT=100&CRS=" + crs
     bboxw = extent[2] - extent[0]
     bboxh = extent[3] - extent[1]
     bboxcx = 0.5 * (extent[0] + extent[2])
@@ -65,7 +63,8 @@ def getThumbnail(configItem, resultItem, layers, crs, extent):
         request = urlopen(url)
         reply = request.read()
         basename = configItem["url"].rsplit("/")[-1] + ".png"
-        thumbnail = os.path.join(qwc2_path, 'assets/img/genmapthumbs/', basename)
+        os.makedirs(qwc2_path + "/assets/img/genmapthumbs/")
+        thumbnail = qwc2_path + "/assets/img/genmapthumbs/" + basename
         with open(thumbnail, "wb") as fh:
             fh.write(reply)
         resultItem["thumbnail"] = "img/genmapthumbs/" + basename
@@ -104,8 +103,9 @@ def urlPath(url):
 def wmsName(url):
     # get WMS name as relative path to QGIS server base path
     wms_name = url_parse(url).path
-    if wms_name.startswith(qgis_server_base_path):
-        wms_name = wms_name[len(qgis_server_base_path):]
+    server_base_path = url_parse(baseUrl).path
+    if wms_name.startswith(server_base_path):
+        wms_name = wms_name[len(server_base_path):]
 
     return wms_name
 
@@ -130,13 +130,13 @@ def getChildElementValue(parent, path):
 
 
 # recursively get layer tree
-def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, level, collapseBelowLevel, titleNameMap):
+def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, level, collapseBelowLevel, titleNameMap, featureReports):
     name = getChildElementValue(layer, "Name")
     title = getChildElementValue(layer, "Title")
     layers = getDirectChildElements(layer, "Layer")
     treeName = getChildElementValue(layer, "TreeName")
 
-    # print("getLayerTree from root layer '%s' (devel %d) with permisssions %s" % (name, level, permissions))
+    # print("getLayerTree from root layer '%s' (devel %d) with permissions %s" % (name, level, permissions))
     if permissions is not None and level > 1 and name not in permissions['public_layers']:
         return  # omit layer
 
@@ -165,7 +165,7 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
             onlineResource = getChildElement(layer, "Attribution/OnlineResource")
             layerEntry["attribution"] = {
                 "Title": getChildElementValue(layer, "Attribution/Title"),
-                "OnlineResource": onlineResource.getAttribute("xlink:href")
+                "OnlineResource": onlineResource.getAttribute("xlink:href") if onlineResource else ""
             }
         except:
             pass
@@ -212,13 +212,15 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
                     float(getChildElementValue(geoBBox, "northBoundLatitude"))
                 ]
             }
+        if name in featureReports:
+            layerEntry["featureReport"] = featureReports[name]
     else:
         # group
         layerEntry["mutuallyExclusive"] = layer.getAttribute("mutuallyExclusive") == "1"
         layerEntry["sublayers"] = []
         layerEntry["expanded"] = False if collapseBelowLevel >= 0 and level >= collapseBelowLevel else True
         for sublayer in layers:
-            getLayerTree(sublayer, permissions, layerEntry["sublayers"], visibleLayers, printLayers, level + 1, collapseBelowLevel, titleNameMap)
+            getLayerTree(sublayer, permissions, layerEntry["sublayers"], visibleLayers, printLayers, level + 1, collapseBelowLevel, titleNameMap, featureReports)
 
         if not layerEntry["sublayers"]:
             # skip empty groups
@@ -229,11 +231,11 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
 
 
 # parse GetCapabilities for theme
-def getTheme(config, permissions, configItem, resultItem):
-    url = urljoin(qgis_server_url, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetProjectSettings"
+def getTheme(config, permissions, configItem, result, resultItem):
+    url = urljoin(baseUrl, configItem["url"]) + "?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetProjectSettings"
 
     try:
-        project_permissions = permissions.get(wmsName(configItem["url"]))
+        project_permissions = permissions.get(wmsName(configItem["url"])) if permissions is not None else None
         if not project_permissions:
             # no WMS permissions
             return
@@ -244,13 +246,6 @@ def getTheme(config, permissions, configItem, resultItem):
         print("Parsing WMS GetProjectSettings of " + configItem["url"])
 
         topLayer = getChildElement(getChildElement(capabilities, "Capability"), "Layer")
-        themeId = getChildElementValue(topLayer, "Name")
-        if themeId in usedThemeIds:
-            i = 0
-            while "%s%d" % (themeId, i) in usedThemeIds:
-                i += 1
-            themeId = "%s%d" % (themeId, i)
-        usedThemeIds.append(themeId)
 
         # use name from config or fallback to WMS title
         wmsTitle = configItem.get("title") or getChildElementValue(capabilities, "Service/Title") or getChildElementValue(topLayer, "Title")
@@ -277,8 +272,9 @@ def getTheme(config, permissions, configItem, resultItem):
         layerTree = []
         visibleLayers = []
         titleNameMap = {}
+        featureReports = configItem["featureReport"] if "featureReport" in configItem else {}
         getLayerTree(topLayer, project_permissions, layerTree, visibleLayers,
-                     printLayers, 1, collapseLayerGroupsBelowLevel, titleNameMap)
+                     printLayers, 1, collapseLayerGroupsBelowLevel, titleNameMap, featureReports)
         visibleLayers.reverse()
 
         # print templates
@@ -318,7 +314,7 @@ def getTheme(config, permissions, configItem, resultItem):
 
         # update theme config
         resultItem["url"] = urlPath(configItem["url"])
-        resultItem["id"] = themeId
+        resultItem["id"] = str(uuid.uuid1())
         resultItem["name"] = getChildElementValue(topLayer, "Name")
         resultItem["title"] = wmsTitle
         resultItem["attribution"] = {
@@ -369,7 +365,6 @@ def getTheme(config, permissions, configItem, resultItem):
         if "backgroundLayers" in configItem:
             resultItem["backgroundLayers"] = configItem["backgroundLayers"]
         resultItem["searchProviders"] = configItem["searchProviders"]
-        resultItem["featureReport"] = configItem["featureReport"] if "featureReport" in configItem else None
         if "additionalMouseCrs" in configItem:
             resultItem["additionalMouseCrs"] = configItem["additionalMouseCrs"]
         if "mapCrs" in configItem:
@@ -393,6 +388,9 @@ def getTheme(config, permissions, configItem, resultItem):
 
         if "skipEmptyFeatureAttributes" in configItem:
             resultItem["skipEmptyFeatureAttributes"] = configItem["skipEmptyFeatureAttributes"]
+
+        if "allowReorderingLayers" in configItem:
+            resultItem["allowReorderingLayers"] = configItem["allowReorderingLayers"]
 
         if project_permissions.get('edit_config'):
             # edit config from permissions
@@ -431,10 +429,10 @@ def getTheme(config, permissions, configItem, resultItem):
 
 
 # recursively get themes for groups
-def getGroupThemes(config, permissions, configGroup, resultGroup):
+def getGroupThemes(config, permissions, configGroup, result, resultGroup):
     for item in configGroup["items"]:
         itemEntry = {}
-        getTheme(config, permissions, item, itemEntry)
+        getTheme(config, permissions, item, result, itemEntry)
         if itemEntry:
             resultGroup["items"].append(itemEntry)
 
@@ -445,7 +443,7 @@ def getGroupThemes(config, permissions, configGroup, resultGroup):
                 "items": [],
                 "subdirs": []
             }
-            getGroupThemes(config, permissions, group, groupEntry)
+            getGroupThemes(config, permissions, group, result, groupEntry)
             resultGroup["subdirs"].append(groupEntry)
 
 
@@ -458,20 +456,14 @@ def reformatAttribution(entry):
     return entry
 
 
-# FIXME: remove global var
-result = {}
-
-
-def genThemes(themesConfig, permissions):
+def genThemes(themesConfig, permissions=None):
     # load themesConfig.json
     try:
         with open(themesConfig, encoding='utf-8') as fh:
             config = json.load(fh)
     except:
-        print("Failed to read themesConfig.json. Please run this script from a directory containing themesConfig.json.")
-        sys.exit(1)  # FIXME
+        return {"error": "Failed to read themesConfig.json"}
 
-    global result
     result = {
         "themes": {
             "title": "root",
@@ -486,13 +478,13 @@ def genThemes(themesConfig, permissions):
             "defaultWMSVersion": config["defaultWMSVersion"] if "defaultWMSVersion" in config else None
             }
     }
-    getGroupThemes(config, permissions, config["themes"], result["themes"])
+    getGroupThemes(config, permissions, config["themes"], result, result["themes"])
 
     if "backgroundLayers" in result["themes"]:
         # get thumbnails for background layers
         for backgroundLayer in result["themes"]["backgroundLayers"]:
             imgPath = "img/mapthumbs/" + backgroundLayer.get("thumbnail", "default.jpg")
-            if not os.path.isfile(os.path.join(qwc2_path, 'assets', imgPath)):
+            if not os.path.isfile(qwc2_path + "/assets/" + imgPath):
                 imgPath = "img/mapthumbs/default.jpg"
             backgroundLayer["thumbnail"] = imgPath
 
@@ -501,7 +493,7 @@ def genThemes(themesConfig, permissions):
 
 if __name__ == '__main__':
     print("Reading " + themesConfig)
-    themes = genThemes(themesConfig, None)
+    themes = genThemes(themesConfig)
     # write config file
     with open("./themes.json", "w") as fh:
         json.dump(themes, fh, indent=2, separators=(',', ': '), sort_keys=True)
