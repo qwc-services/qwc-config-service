@@ -85,4 +85,6 @@ class ServicePermissions(Resource):
 # local webserver
 if __name__ == '__main__':
     print("Starting Config service...")
+    from flask_cors import CORS
+    CORS(app)
     app.run(host='localhost', port=5010, debug=True)
