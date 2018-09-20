@@ -26,7 +26,7 @@ from werkzeug.urls import url_parse
 
 
 # get internal QGIS server URL from ENV
-baseUrl = os.environ.get('QGIS_SERVER_URL', 'http://localhost:8001/ows/')
+baseUrl = os.environ.get('QGIS_SERVER_URL', 'http://localhost/wms').rstrip('/') + '/'
 qwc2_path = os.environ.get("QWC2_PATH", "qwc2").rstrip("/")
 themesConfig = os.environ.get("QWC2_THEMES_CONFIG", "themesConfig.json")
 

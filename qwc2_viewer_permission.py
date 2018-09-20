@@ -64,7 +64,7 @@ class QWC2ViewerPermission(PermissionQuery):
 
         # get internal QGIS server URL from ENV
         qgis_server_url = os.environ.get('QGIS_SERVER_URL',
-                                         'http://localhost:8001/ows/')
+                                         'http://localhost/wms/').rstrip('/') + '/'
         self.qgis_server_base_path = url_parse(qgis_server_url).path
 
     def permissions(self, params, username, session):
