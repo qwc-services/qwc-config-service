@@ -19,20 +19,40 @@ config_service = ConfigService(app.logger)
 
 
 # Api models
-permissions_response = create_model(api, 'Permissions', [
-    ['service', fields.String(required=True, description='Service type',
-                              example='ogc')],
-    ['permissions', fields.Raw(required=True,
-                               description='Service specific permissions',
-                               example={'layers': '...'})]
-])
-
 last_update_response = create_model(api, 'LastUpdate', [
     ['permissions_updated_at', fields.String(
         required=True,
         description='Timestamp of last permissions update',
         example='2018-07-09 12:00:00'
     )]
+])
+
+resource_permissions_response = create_model(api, 'Resource permissions', [
+    ['resource_type', fields.String(required=True, description='Resource type',
+                                    example='map')],
+    ['permissions', fields.Raw(required=True,
+                               description='Permitted resources',
+                               example={'1': {'id': 1, 'name': 'qwc_demo',
+                                        'parent_id': None, 'writable': False}}
+                               )]
+])
+
+resource_restrictions_response = create_model(api, 'Resource restrictions', [
+    ['resource_type', fields.String(required=True, description='Resource type',
+                                    example='data')],
+    ['restrictions', fields.Raw(required=True,
+                                description='Restricted resources',
+                                example={'2': {'id': 2, 'name': 'edit_points',
+                                         'parent_id': 1}}
+                                )]
+])
+
+service_permissions_response = create_model(api, 'Service permissions', [
+    ['service', fields.String(required=True, description='Service type',
+                              example='ogc')],
+    ['permissions', fields.Raw(required=True,
+                               description='Service specific permissions',
+                               example={'layers': '...'})]
 ])
 
 
@@ -46,6 +66,62 @@ class LastUpdate(Resource):
         return config_service.last_update()
 
 
+@api.route('/permissions/<resource_type>')
+@api.param('resource_type', 'Resource type (e.g. <i>map</i>, <i>layer</i>)',
+           default='map')
+@api.param('username', 'User name')
+@api.param('name', 'Resource name filter (optional)')
+@api.param('parent_id', 'Parent resource ID filter (optional)')
+class Permissions(Resource):
+    @api.doc('resource_permissions')
+    @api.marshal_with(resource_permissions_response)
+    def get(self, resource_type):
+        """Query permitted resources for a resource type
+
+        <b>permissions</b> are empty if resource type is not available or \
+        not permitted
+        """
+        username = request.args.get('username', None)
+        result = config_service.resource_permissions(
+            resource_type, request.args, username
+        )
+        if 'error' not in result:
+            return {
+                'resource_type': resource_type,
+                'permissions': result['permissions']
+            }
+        else:
+            api.abort(404, result['error'])
+
+
+@api.route('/restrictions/<resource_type>')
+@api.param('resource_type', 'Resource type (e.g. <i>map</i>, <i>layer</i>)',
+           default='map')
+@api.param('username', 'User name')
+@api.param('name', 'Resource name filter (optional)')
+@api.param('parent_id', 'Parent resource ID filter (optional)')
+class Restrictions(Resource):
+    @api.doc('resource_restrictions')
+    @api.marshal_with(resource_restrictions_response)
+    def get(self, resource_type):
+        """Query restricted resources for a resource type
+
+        <b>permissions</b> are empty if resource type is not available or \
+        not restricted
+        """
+        username = request.args.get('username', None)
+        result = config_service.resource_restrictions(
+            resource_type, request.args, username
+        )
+        if 'error' not in result:
+            return {
+                'resource_type': resource_type,
+                'restrictions': result['restrictions']
+            }
+        else:
+            api.abort(404, result['error'])
+
+
 @api.route('/<service>')
 @api.response(404, 'Service type not found')
 @api.param('service', 'Service type (<i>ogc</i>, <i>data</i>, <i>qwc</i>)',
@@ -55,12 +131,12 @@ class LastUpdate(Resource):
 @api.param('ows_type', 'OWS type (<i>WMS</i> or <i>WFS</i>)', default='WMS')
 @api.param('dataset', 'Dataset ID', default='qwc_demo.edit_points')
 class ServicePermissions(Resource):
-    @api.doc('permissions')
-    @api.marshal_with(permissions_response)
+    @api.doc('service_permissions')
+    @api.marshal_with(service_permissions_response)
     def get(self, service):
         """Query permissions for a service
 
-        <b>permissions</b> are empty if service is not available or
+        <b>permissions</b> are empty if service is not available or \
         not permitted
 
         Additional query parameters are service specific:

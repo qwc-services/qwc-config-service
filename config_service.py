@@ -6,6 +6,7 @@ from qwc_services_core.database import DatabaseEngine
 from data_service_permission import DataServicePermission
 from ogc_service_permission import OGCServicePermission
 from qwc2_viewer_permission import QWC2ViewerPermission
+from resource_permission import ResourcePermission
 
 
 class ConfigService:
@@ -37,6 +38,10 @@ class ConfigService:
             'ogc': ogc_permission_handler,
             'qwc': qwc_permission_handler
         }
+
+        self.resource_permission_handler = ResourcePermission(
+            self.config_models, logger
+        )
 
         # get path to QWC2 themes config from ENV
         qwc2_path = os.environ.get('QWC2_PATH', 'qwc2/')
@@ -103,3 +108,47 @@ class ConfigService:
             }
         else:
             return {'error': "Service type '%s' not found" % service}
+
+    def resource_permissions(self, resource_type, params, username):
+        """Return permitted resources for a resource type.
+
+        :param str resource_type: Resource type
+        :param obj params: Request parameters
+        :param str username: User name
+        """
+        # create session for ConfigDB
+        session = self.config_models.session()
+
+        # query permitted resources
+        permissions = self.resource_permission_handler.permissions(
+            resource_type, params, username, session
+        )
+
+        # close session
+        session.close()
+
+        return {
+            'permissions': permissions
+        }
+
+    def resource_restrictions(self, resource_type, params, username):
+        """Return restricted resources for a resource type.
+
+        :param str resource_type: Resource type
+        :param obj params: Request parameters
+        :param str username: User name
+        """
+        # create session for ConfigDB
+        session = self.config_models.session()
+
+        # query restricted resources
+        restrictions = self.resource_permission_handler.restrictions(
+            resource_type, params, username, session
+        )
+
+        # close session
+        session.close()
+
+        return {
+            'restrictions': restrictions
+        }
