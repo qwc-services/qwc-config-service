@@ -174,6 +174,7 @@ class OGCServicePermission(PermissionQuery):
             for attr in attrs.findall('%sAttribute' % np, ns):
                 attributes.append(attr.get('alias', attr.get('name')))
             attributes.append('geometry')
+            attributes.append('maptip')
 
         permissions['layers'][layer_name] = attributes
 
