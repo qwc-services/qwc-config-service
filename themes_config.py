@@ -246,7 +246,6 @@ def getTheme(config, permissions, configItem, result, resultItem):
         reply = urlopen(url).read()
         capabilities = parseString(reply)
         capabilities = capabilities.getElementsByTagName("WMS_Capabilities")[0]
-        print("Parsing WMS GetProjectSettings of " + configItem["url"])
 
         topLayer = getChildElement(getChildElement(capabilities, "Capability"), "Layer")
 
