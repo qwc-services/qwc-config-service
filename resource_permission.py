@@ -9,7 +9,7 @@ class ResourcePermission(PermissionQuery):
     Query permissions and restrictions for a resource type.
     """
 
-    def permissions(self, resource_type, params, username, session):
+    def permissions(self, resource_type, params, username, group, session):
         """Query permitted resources for a resource type with optional
         name or parent_id filter.
 
@@ -19,6 +19,7 @@ class ResourcePermission(PermissionQuery):
         :param obj params: Optional request parameters with
                            name=<name filter>&parent_id=<parent filter>
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         permissions = {}
@@ -29,7 +30,7 @@ class ResourcePermission(PermissionQuery):
         Permission = self.config_models.model('permissions')
         Resource = self.config_models.model('resources')
 
-        query = self.user_permissions_query(username, session) \
+        query = self.user_permissions_query(username, group, session) \
             .join(Permission.resource).filter(Resource.type == resource_type) \
             .order_by(Permission.priority) \
             .distinct(Permission.priority)
@@ -61,7 +62,7 @@ class ResourcePermission(PermissionQuery):
 
         return permissions
 
-    def restrictions(self, resource_type, params, username, session):
+    def restrictions(self, resource_type, params, username, group, session):
         """Query restricted resources for a resource type with optional
         name or parent_id filter.
 
@@ -71,6 +72,7 @@ class ResourcePermission(PermissionQuery):
         :param obj params: Optional request parameters with
                            name=<name filter>&parent_id=<parent filter>
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         restrictions = {}
@@ -81,7 +83,7 @@ class ResourcePermission(PermissionQuery):
         Resource = self.config_models.model('resources')
 
         query = self.resource_restrictions_query(
-            resource_type, username, session
+            resource_type, username, group, session
         )
 
         # optional filters

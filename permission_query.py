@@ -20,19 +20,20 @@ class PermissionQuery:
         self.config_models = config_models
         self.logger = logger
 
-    def permissions(self, params, username, session):
+    def permissions(self, params, username, group, session):
         """Query permissions for a QWC resource and dataset.
 
         Return resource specific permissions for a dataset.
 
         :param obj params: Service specific request parameters
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         raise NotImplementedError
 
     def resource_permissions(self, resource_type, resource_name, username,
-                             session):
+                             group, session):
         """Query permissions for a QWC resource type and name.
 
         Return resource permissions sorted by priority.
@@ -40,13 +41,14 @@ class PermissionQuery:
         :param str resource_type: QWC resource type
         :param str resource_name: QWC resource name
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         Permission = self.config_models.model('permissions')
         Resource = self.config_models.model('resources')
 
         # base query for all permissions of user
-        query = self.user_permissions_query(username, session)
+        query = self.user_permissions_query(username, group, session)
 
         # filter permissions by QWC resource type and name
         query = query.join(Permission.resource) \
@@ -60,11 +62,14 @@ class PermissionQuery:
         # execute query and return results
         return query.all()
 
-    def resource_restrictions_query(self, resource_type, username, session):
-        """Create query for restrictions for a QWC resource type and user.
+    def resource_restrictions_query(self, resource_type, username, group,
+                                    session):
+        """Create query for restrictions for a QWC resource type, user and
+        group.
 
         :param str resource_type: QWC resource type
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         Permission = self.config_models.model('permissions')
@@ -77,7 +82,8 @@ class PermissionQuery:
             filter(Resource.type == resource_type)
 
         # resource permissions for user
-        user_permissions = self.user_permissions_query(username, session). \
+        user_permissions = \
+            self.user_permissions_query(username, group, session). \
             join(Permission.resource). \
             with_entities(Resource.id, Resource.name, Resource.parent_id). \
             filter(Resource.type == resource_type)
@@ -87,10 +93,14 @@ class PermissionQuery:
 
         return restrictions_query
 
-    def user_permissions_query(self, username, session):
-        """Create base query for all permissions of a user.
+    def user_permissions_query(self, username, group, session):
+        """Create base query for all permissions of a user and group.
+
+        Combine permissions from roles of user and user groups, group roles and
+        public role.
 
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         Permission = self.config_models.model('permissions')
@@ -101,7 +111,7 @@ class PermissionQuery:
         # create query
         query = session.query(Permission)
 
-        # filter by username
+        # filter by username and group
         # NOTE: use nested JOINs to filter early and avoid too many rows
         #       from cartesian product
         # query permissions from roles in user groups
@@ -115,13 +125,18 @@ class PermissionQuery:
             .join(Role.users_collection) \
             .filter(User.name == username)
 
+        # query permissions from group roles
+        group_roles_query = query.join(Permission.role) \
+            .join(Role.groups_collection) \
+            .filter(Group.name == group)
+
         # query permissions from public role
         public_roles_query = query.join(Permission.role) \
             .filter(Role.name == self.PUBLIC_ROLE_NAME)
 
         # combine queries
         query = groups_roles_query.union(user_roles_query) \
-            .union(public_roles_query)
+            .union(group_roles_query).union(public_roles_query)
 
         # unique permissions
         query = query.distinct(Permission.id)

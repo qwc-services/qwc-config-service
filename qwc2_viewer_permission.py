@@ -16,11 +16,11 @@ class QWC2ViewerPermission(PermissionQuery):
     #     PostGIS geometry type -> QWC2 edit geometry type
     EDIT_GEOM_TYPES = {
         'POINT': 'Point',
-        'MULTIPOINT': 'Point',
+        'MULTIPOINT': 'MultiPoint',
         'LINESTRING': 'LineString',
-        'MULTILINESTRING': 'LineString',
+        'MULTILINESTRING': 'MultiLineString',
         'POLYGON': 'Polygon',
-        'MULTIPOLYGON': 'Polygon'
+        'MULTIPOLYGON': 'MultiPolygon'
     }
 
     # lookup for edit field types:
@@ -67,13 +67,14 @@ class QWC2ViewerPermission(PermissionQuery):
                                          'http://localhost/wms/').rstrip('/') + '/'
         self.qgis_server_base_path = url_parse(qgis_server_url).path
 
-    def permissions(self, params, username, session):
+    def permissions(self, params, username, group, session):
         '''Query permissions for QWC service.
 
         Return data for QWC themes.json for available and permitted resources.
 
         :param obj params: Request parameters
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         '''
         # get themes from QWC2 themes config
@@ -83,19 +84,20 @@ class QWC2ViewerPermission(PermissionQuery):
         # query WMS permissions for each theme
         permissions = {}
         self.themes_group_permissions(
-            config.get('themes', {}), permissions, username, session
+            config.get('themes', {}), permissions, username, group, session
         )
 
         return genThemes(self.themes_config_path, permissions)
 
     def themes_group_permissions(self, group_config, permissions, username,
-                                 session):
+                                 group, session):
         """Recursively collect WMS and edit permissions for each theme in a
         group.
 
         :param obj group_config: Sub config for theme group
         :param obj permissions: Collected WMS and edit permissions
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         theme_items = group_config.get('items', [])
@@ -110,13 +112,13 @@ class QWC2ViewerPermission(PermissionQuery):
                 # query WMS permissions
                 ogc_params = {'ows_type': 'WMS', 'ows_name': wms_name}
                 permissions[wms_name] = self.ogc_permission_handler.permissions(
-                    ogc_params, username, session
+                    ogc_params, username, group, session
                 )
 
                 if permissions[wms_name]:
                     # query edit permissions
                     edit_config = self.edit_permissions(
-                        wms_name, username, session
+                        wms_name, username, group, session
                     )
                     if edit_config:
                         permissions[wms_name]['edit_config'] = edit_config
@@ -124,39 +126,41 @@ class QWC2ViewerPermission(PermissionQuery):
         groups = group_config.get('groups', [])
         for group in groups:
             # collect sub group permissions
-            self.themes_group_permissions(group, permissions, username)
+            self.themes_group_permissions(group, permissions, username, group)
 
-    def edit_permissions(self, map_name, username, session):
+    def edit_permissions(self, map_name, username, group, session):
         """Query edit permissions for a theme.
 
         :param str map_name: Map name (matches WMS and QGIS project)
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         edit_config = {}
 
-        edit_datasets = self.edit_datasets(map_name, username, session)
+        edit_datasets = self.edit_datasets(map_name, username, group, session)
         for dataset in edit_datasets:
             edit_layer_config = self.edit_layer_config(
-                map_name, dataset, username, session
+                map_name, dataset, username, group, session
             )
             if edit_layer_config:
                 edit_config[dataset] = edit_layer_config
 
         return edit_config
 
-    def edit_datasets(self, map_name, username, session):
+    def edit_datasets(self, map_name, username, group, session):
         """Get permitted edit datasets for a map.
 
         :param str map_name: Map name
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         Permission = self.config_models.model('permissions')
         Resource = self.config_models.model('resources')
 
         # query map permissions
-        maps_query = self.user_permissions_query(username, session). \
+        maps_query = self.user_permissions_query(username, group, session). \
             join(Permission.resource).filter(Resource.type == 'map'). \
             filter(Resource.name == map_name). \
             distinct(Resource.name)
@@ -170,7 +174,7 @@ class QWC2ViewerPermission(PermissionQuery):
 
         # query writable data permissions
         edit_datasets = []
-        data_query = self.user_permissions_query(username, session). \
+        data_query = self.user_permissions_query(username, group, session). \
             join(Permission.resource).filter(Resource.type == 'data'). \
             filter(Permission.write). \
             filter(Resource.parent_id == map_id)
@@ -179,12 +183,13 @@ class QWC2ViewerPermission(PermissionQuery):
 
         return edit_datasets
 
-    def edit_layer_config(self, map_name, layer_name, username, session):
+    def edit_layer_config(self, map_name, layer_name, username, group, session):
         """Get permitted edit config for a dataset.
 
         :param str map_name: Map name
         :param str layer_name: Data layer name
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         dataset = "%s.%s" % (map_name, layer_name)
@@ -192,7 +197,7 @@ class QWC2ViewerPermission(PermissionQuery):
         # query data permissions
         data_params = {'dataset': dataset}
         permissions = self.data_permission_handler.permissions(
-            data_params, username, session
+            data_params, username, group, session
         )
 
         if permissions['geometry_type'] not in self.EDIT_GEOM_TYPES:

@@ -83,12 +83,13 @@ class ConfigService:
             'permissions_updated_at': updated_at.strftime("%Y-%m-%d %H:%M:%S")
         }
 
-    def service_permissions(self, service, params, username):
+    def service_permissions(self, service, params, username, group):
         """Return permissions for a service and a dataset.
 
         :param str service: Service type
         :param obj params: Service specific request parameters
         :param str username: User name
+        :param str group: Group name
         """
         permission_handler = self.permission_handlers.get(service, None)
         if permission_handler is not None:
@@ -97,7 +98,7 @@ class ConfigService:
 
             # query permissions
             permissions = permission_handler.permissions(
-                params, username, session
+                params, username, group, session
             )
 
             # close session
@@ -109,19 +110,20 @@ class ConfigService:
         else:
             return {'error': "Service type '%s' not found" % service}
 
-    def resource_permissions(self, resource_type, params, username):
+    def resource_permissions(self, resource_type, params, username, group):
         """Return permitted resources for a resource type.
 
         :param str resource_type: Resource type
         :param obj params: Request parameters
         :param str username: User name
+        :param str group: Group name
         """
         # create session for ConfigDB
         session = self.config_models.session()
 
         # query permitted resources
         permissions = self.resource_permission_handler.permissions(
-            resource_type, params, username, session
+            resource_type, params, username, group, session
         )
 
         # close session
@@ -131,19 +133,20 @@ class ConfigService:
             'permissions': permissions
         }
 
-    def resource_restrictions(self, resource_type, params, username):
+    def resource_restrictions(self, resource_type, params, username, group):
         """Return restricted resources for a resource type.
 
         :param str resource_type: Resource type
         :param obj params: Request parameters
         :param str username: User name
+        :param str group: Group name
         """
         # create session for ConfigDB
         session = self.config_models.session()
 
         # query restricted resources
         restrictions = self.resource_permission_handler.restrictions(
-            resource_type, params, username, session
+            resource_type, params, username, group, session
         )
 
         # close session

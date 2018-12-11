@@ -22,7 +22,7 @@ class DataServicePermission(PermissionQuery):
 
         self.db_engine = db_engine
 
-    def permissions(self, params, username, session):
+    def permissions(self, params, username, group, session):
         """Query permissions for editing a dataset.
 
         Return dataset edit permissions if available and permitted.
@@ -32,6 +32,7 @@ class DataServicePermission(PermissionQuery):
 
         :param obj params: Request parameters with dataset='<Dataset ID>'
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         permissions = {}
@@ -47,7 +48,7 @@ class DataServicePermission(PermissionQuery):
             layer_name = dataset
 
         data_permissions = self.data_permissions(
-            map_name, layer_name, username, session
+            map_name, layer_name, username, group, session
         )
 
         if data_permissions['permitted']:
@@ -71,7 +72,7 @@ class DataServicePermission(PermissionQuery):
 
         return permissions
 
-    def data_permissions(self, map_name, layer_name, username, session):
+    def data_permissions(self, map_name, layer_name, username, group, session):
         """Query resource permissions and return whether map and data layer are
         permitted and writable, and any restricted attributes.
 
@@ -80,6 +81,7 @@ class DataServicePermission(PermissionQuery):
         :param str map_name: Map name
         :param str layer_name: Data layer name
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         Permission = self.config_models.model('permissions')
@@ -88,8 +90,9 @@ class DataServicePermission(PermissionQuery):
         map_id = None
         if map_name is None:
             # find map for data layer name
-            data_query = self.user_permissions_query(username, session). \
-                join(Permission.resource).filter(Resource.type == 'data'). \
+            data_query = self.user_permissions_query(
+                    username, group, session
+                ).join(Permission.resource).filter(Resource.type == 'data'). \
                 filter(Resource.name == layer_name). \
                 order_by(Permission.priority.desc()). \
                 distinct(Permission.priority)
@@ -108,8 +111,9 @@ class DataServicePermission(PermissionQuery):
                     )
         else:
             # query map permissions
-            maps_query = self.user_permissions_query(username, session). \
-                join(Permission.resource).filter(Resource.type == 'map'). \
+            maps_query = self.user_permissions_query(
+                    username, group, session
+                ).join(Permission.resource).filter(Resource.type == 'map'). \
                 filter(Resource.name == map_name)
             for map_permission in maps_query.all():
                 map_id = map_permission.resource.id
@@ -125,7 +129,7 @@ class DataServicePermission(PermissionQuery):
         permitted = False
         writable = False
         restricted_attributes = []
-        data_query = self.user_permissions_query(username, session). \
+        data_query = self.user_permissions_query(username, group, session). \
             join(Permission.resource).filter(Resource.type == 'data'). \
             filter(Resource.parent_id == map_id). \
             filter(Resource.name == layer_name). \
@@ -139,7 +143,7 @@ class DataServicePermission(PermissionQuery):
 
             # query attribute restrictions
             attrs_query = self.resource_restrictions_query(
-                'attribute', username, session
+                'attribute', username, group, session
             ).filter(Resource.parent_id == data_permission.resource_id)
             for attr in attrs_query.all():
                 restricted_attributes.append(attr.name)

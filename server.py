@@ -70,6 +70,7 @@ class LastUpdate(Resource):
 @api.param('resource_type', 'Resource type (e.g. <i>map</i>, <i>layer</i>)',
            default='map')
 @api.param('username', 'User name')
+@api.param('group', 'Group name')
 @api.param('name', 'Resource name filter (optional)')
 @api.param('parent_id', 'Parent resource ID filter (optional)')
 class Permissions(Resource):
@@ -82,8 +83,9 @@ class Permissions(Resource):
         not permitted
         """
         username = request.args.get('username', None)
+        group = request.args.get('group', None)
         result = config_service.resource_permissions(
-            resource_type, request.args, username
+            resource_type, request.args, username, group
         )
         if 'error' not in result:
             return {
@@ -98,6 +100,7 @@ class Permissions(Resource):
 @api.param('resource_type', 'Resource type (e.g. <i>map</i>, <i>layer</i>)',
            default='map')
 @api.param('username', 'User name')
+@api.param('group', 'Group name')
 @api.param('name', 'Resource name filter (optional)')
 @api.param('parent_id', 'Parent resource ID filter (optional)')
 class Restrictions(Resource):
@@ -110,8 +113,9 @@ class Restrictions(Resource):
         not restricted
         """
         username = request.args.get('username', None)
+        group = request.args.get('group', None)
         result = config_service.resource_restrictions(
-            resource_type, request.args, username
+            resource_type, request.args, username, group
         )
         if 'error' not in result:
             return {
@@ -127,6 +131,7 @@ class Restrictions(Resource):
 @api.param('service', 'Service type (<i>ogc</i>, <i>data</i>, <i>qwc</i>)',
            default='ogc')
 @api.param('username', 'User name')
+@api.param('group', 'Group name')
 @api.param('ows_name', 'WMS/WFS name', default='qwc_demo')
 @api.param('ows_type', 'OWS type (<i>WMS</i> or <i>WFS</i>)', default='WMS')
 @api.param('dataset', 'Dataset ID', default='qwc_demo.edit_points')
@@ -146,8 +151,9 @@ class ServicePermissions(Resource):
         * <b>dataset</b>: Data service
         """
         username = request.args.get('username', None)
+        group = request.args.get('group', None)
         result = config_service.service_permissions(
-            service, request.args, username
+            service, request.args, username, group
         )
         if 'error' not in result:
             return {

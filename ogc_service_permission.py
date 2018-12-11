@@ -28,7 +28,7 @@ class OGCServicePermission(PermissionQuery):
         self.qgis_server_url = os.environ.get('QGIS_SERVER_URL',
                                               'http://localhost/wms/').rstrip('/') + '/'
 
-    def permissions(self, params, username, session):
+    def permissions(self, params, username, group, session):
         """Query permissions for OGC service.
 
         Return OGC service permissions if available and permitted.
@@ -36,6 +36,7 @@ class OGCServicePermission(PermissionQuery):
         :param obj params: Request parameters with
                            ows_name=<OWS service name>&ows_type=<OWS type>
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         permissions = {}
@@ -53,7 +54,7 @@ class OGCServicePermission(PermissionQuery):
         if permissions:
             # filter by restricted resources
             permissions = self.filter_restricted_resources(
-                ows_name, permissions, username, session
+                ows_name, permissions, username, group, session
             )
 
         return permissions
@@ -179,7 +180,7 @@ class OGCServicePermission(PermissionQuery):
         permissions['layers'][layer_name] = attributes
 
     def filter_restricted_resources(self, ows_name, permissions, username,
-                                    session):
+                                    group, session):
         """Filter restricted resources from OGC service permissions.
 
         Return filtered OGC service permissions.
@@ -187,6 +188,7 @@ class OGCServicePermission(PermissionQuery):
         :param str ows_name: Map name
         :param obj permissions: OGC service permissions
         :param str username: User name
+        :param str group: Group name
         :param Session session: DB session
         """
         Permission = self.config_models.model('permissions')
@@ -194,7 +196,7 @@ class OGCServicePermission(PermissionQuery):
 
         # query map restrictions
         maps_query = self.resource_restrictions_query(
-                'map', username, session
+                'map', username, group, session
             ).filter(Resource.type == 'map').filter(Resource.name == ows_name)
 
         if maps_query.count() > 0:
@@ -203,7 +205,7 @@ class OGCServicePermission(PermissionQuery):
 
         # query map permissions
         map_id = None
-        maps_query = self.user_permissions_query(username, session). \
+        maps_query = self.user_permissions_query(username, group, session). \
             join(Permission.resource).filter(Resource.type == 'map'). \
             filter(Resource.name == ows_name)
         for map_permission in maps_query.all():
@@ -216,7 +218,7 @@ class OGCServicePermission(PermissionQuery):
 
         # query layer restrictions
         layers_query = self.resource_restrictions_query(
-                'layer', username, session
+                'layer', username, group, session
             ).filter(Resource.parent_id == map_id)
 
         # remove restricted layers
@@ -226,7 +228,7 @@ class OGCServicePermission(PermissionQuery):
         # query attribute restrictions
         layer_alias = aliased(Resource)
         attrs_query = self.resource_restrictions_query(
-                'attribute', username, session
+                'attribute', username, group, session
             )
         # join to layer resources
         attrs_query = attrs_query.join(
