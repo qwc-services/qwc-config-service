@@ -128,15 +128,22 @@ class OGCServicePermission(PermissionQuery):
             # temporary lookup for complete group layers
             'group_layers': {},
             # TODO: extract background layers
-            'background_layers': []
+            'background_layers': [],
+            # print templates: [<template name>]
+            'print_templates': []
         }
 
         # collect layers from layer tree
         self.collect_layers(root_layer, permissions, ns, np, ows_name)
 
+        # collect print templates
+        for template in root.findall('.//%sComposerTemplate' % np, ns):
+            template_name = template.get('name')
+            permissions['print_templates'].append(template_name)
+
         return permissions
 
-    def collect_layers(self, layer, permissions, ns, np, fallback_name = ""):
+    def collect_layers(self, layer, permissions, ns, np, fallback_name=""):
         """Recursively collect layer info for layer subtree from
         GetProjectSettings.
 
@@ -256,6 +263,16 @@ class OGCServicePermission(PermissionQuery):
                 for attr in layers_attributes[layer]:
                     if attr in layer_attrs:
                         layer_attrs.remove(attr)
+
+        # query print template restrictions
+        templates_query = self.resource_restrictions_query(
+                'print_template', username, group, session
+            ).filter(Resource.parent_id == map_id)
+
+        # remove restricted print templates
+        for template in templates_query.all():
+            if template.name in permissions['print_templates']:
+                permissions['print_templates'].remove(template.name)
 
         # remove group_layers
         permissions.pop('group_layers', None)
