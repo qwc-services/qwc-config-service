@@ -284,8 +284,13 @@ def getTheme(config, permissions, configItem, result, resultItem):
         composerTemplates = getChildElement(capabilities, "Capability/ComposerTemplates")
         if composerTemplates:
             for composerTemplate in composerTemplates.getElementsByTagName("ComposerTemplate"):
+                template_name = composerTemplate.getAttribute("name")
+                if template_name not in project_permissions['print_templates']:
+                    # skip if print template is not permitted
+                    continue
+
                 printTemplate = {
-                    "name": composerTemplate.getAttribute("name")
+                    "name": template_name
                 }
                 composerMap = getChildElement(composerTemplate, "ComposerMap")
                 if composerMap:
