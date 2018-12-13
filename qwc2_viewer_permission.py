@@ -87,7 +87,12 @@ class QWC2ViewerPermission(PermissionQuery):
             config.get('themes', {}), permissions, username, group, session
         )
 
-        return genThemes(self.themes_config_path, permissions)
+        result = genThemes(self.themes_config_path, permissions)
+
+        # add viewer permissions
+        result['viewers'] = self.viewer_permissions(username, group, session)
+
+        return result
 
     def themes_group_permissions(self, group_config, permissions, username,
                                  group, session):
@@ -242,3 +247,25 @@ class QWC2ViewerPermission(PermissionQuery):
             'fields': fields,
             'geomType': geometry_type
         }
+
+    def viewer_permissions(self, username, group, session):
+        """Get permitted viewers.
+
+        :param str username: User name
+        :param str group: Group name
+        :param Session session: DB session
+        """
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
+
+        # query viewer permissions
+        viewers = []
+        viewers_query = self.user_permissions_query(
+                username, group, session
+            ).join(Permission.resource). \
+            filter(Resource.type == 'viewer'). \
+            distinct(Resource.name)
+        for permission in viewers_query.all():
+            viewers.append(permission.resource.name)
+
+        return viewers
