@@ -82,16 +82,36 @@ class PermissionQuery:
             filter(Resource.type == resource_type)
 
         # resource permissions for user
+        user_permissions = self.resource_permission_query(
+            resource_type, username, group, session
+        )
+
+        # restrictions without user permissions
+        restrictions_query = all_restrictions.except_(user_permissions)
+
+        return restrictions_query
+
+    def resource_permission_query(self, resource_type, username, group,
+                                  session):
+        """Create query for permissions for a QWC resource type, user and
+        group.
+
+        :param str resource_type: QWC resource type
+        :param str username: User name
+        :param str group: Group name
+        :param Session session: DB session
+        """
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
+
+        # resource permissions for user
         user_permissions = \
             self.user_permissions_query(username, group, session). \
             join(Permission.resource). \
             with_entities(Resource.id, Resource.name, Resource.parent_id). \
             filter(Resource.type == resource_type)
 
-        # restrictions without user permissions
-        restrictions_query = all_restrictions.except_(user_permissions)
-
-        return restrictions_query
+        return user_permissions
 
     def user_permissions_query(self, username, group, session):
         """Create base query for all permissions of a user and group.

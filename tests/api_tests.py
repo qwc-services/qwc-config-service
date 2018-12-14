@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from flask import Response, json
@@ -74,22 +75,63 @@ class ApiTestCase(unittest.TestCase):
                               "Permissions are not a dict")
 
     def check_layer_field_permission(self, layers_permissions):
-        self.assertIn('edit_points', layers_permissions.keys())
-        self.assertIn('name', layers_permissions['edit_points'])
+        self.assertIn('countries', layers_permissions.keys())
+        self.assertIn('adm0_a3', layers_permissions['countries'])
 
     def test_ogc_service_permissions(self):
+        if os.environ.get('DEFAULT_ALLOW', 'True') == 'False':
+            self.skipTest('DEFAULT_ALLOW is False')
+
         status_code, json_data = self.get(
             '/ogc?ows_type=WMS&ows_name=qwc_demo')
+
         self.assertEqual(200, status_code, "Status code is not OK")
         self.assertIn('permissions', json_data)
         self.assertIsInstance(json_data['permissions'], dict,
                               "Permissions are not a dict")
+
         permissions = json_data['permissions']
         self.assertEqual(permissions['qgs_project'], 'qwc_demo')
-        self.assertEqual(['qwc_demo', 'edit_demo', 'edit_points', 'edit_lines',
+        self.assertEqual(permissions['public_layers'],
+                         ['qwc_demo', 'edit_demo', 'edit_points', 'edit_lines',
                           'edit_polygons', 'geographic_lines', 'country_names',
                           'states_provinces', 'countries', 'osm_bg',
-                          'bluemarble_bg'],
-                         permissions['public_layers'])
+                          'bluemarble_bg'])
+        self.assertEqual(permissions['queryable_layers'],
+                         ['qwc_demo', 'edit_demo', 'edit_points', 'edit_lines',
+                          'edit_polygons', 'geographic_lines', 'countries',
+                          'osm_bg', 'bluemarble_bg'])
         self.check_layer_field_permission(permissions['layers'])
+        self.assertEqual(list(permissions['feature_info_aliases'].values()),
+                         ['qwc_demo', 'edit_demo', 'edit_points', 'edit_lines',
+                          'edit_polygons', 'geographic_lines', 'countries',
+                          'osm_bg', 'bluemarble_bg'])
+        self.assertIn('Countries', permissions['feature_info_aliases'])
+        self.assertEqual(permissions['restricted_group_layers'], {})
         self.assertEqual(permissions['print_templates'], ['A4 Landscape'])
+
+    # run with `DEFAULT_ALLOW=False python test.py` and additional permissions
+    def test_ogc_service_permissions_no_default_permit(self):
+        if os.environ.get('DEFAULT_ALLOW', 'True') == 'True':
+            self.skipTest('DEFAULT_ALLOW is True')
+
+        status_code, json_data = self.get(
+            '/ogc?ows_type=WMS&ows_name=qwc_demo')
+
+        self.assertEqual(200, status_code, "Status code is not OK")
+        self.assertIn('permissions', json_data)
+        self.assertIsInstance(json_data['permissions'], dict,
+                              "Permissions are not a dict")
+
+        permissions = json_data['permissions']
+        self.assertEqual(permissions['qgs_project'], 'qwc_demo')
+        self.assertEqual(permissions['public_layers'],
+                         ['countries'])
+        self.assertEqual(permissions['queryable_layers'],
+                         ['countries'])
+        self.check_layer_field_permission(permissions['layers'])
+        self.assertEqual(list(permissions['feature_info_aliases'].values()),
+                         ['countries'])
+        self.assertIn('Countries', permissions['feature_info_aliases'])
+        self.assertEqual(permissions['restricted_group_layers'], {})
+        self.assertEqual(permissions['print_templates'], [])

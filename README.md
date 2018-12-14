@@ -52,6 +52,8 @@ The `themesConfig.json` file is used by the Config service to collect the full t
 
 Copy any QGIS project files required for the Data service to your `QGIS_RESOURCES_PATH`.
 
+Resources like maps and layers can be permitted by default (`DEFAULT_ALLOW=True`) or need explicit permissions (`DEFAULT_ALLOW=False`).
+
 
 Usage
 -----

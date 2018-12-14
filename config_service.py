@@ -23,11 +23,13 @@ class ConfigService:
         self.logger = logger
         self.db_engine = DatabaseEngine()
         self.config_models = ConfigModels(self.db_engine)
+        default_allow = os.environ.get(
+            'DEFAULT_ALLOW', 'True') == 'True'
         data_permission_handler = DataServicePermission(
             self.db_engine, self.config_models, logger
         )
         ogc_permission_handler = OGCServicePermission(
-            self.config_models, logger
+            default_allow, self.config_models, logger
         )
         qwc_permission_handler = QWC2ViewerPermission(
             ogc_permission_handler, data_permission_handler,
