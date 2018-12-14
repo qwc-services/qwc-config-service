@@ -107,3 +107,22 @@ Install requirements:
 Start local service:
 
     QGIS_SERVER_URL=http://localhost:8001/ows/ QGIS_RESOURCES_PATH=qgs/ QWC2_PATH=qwc2/ python server.py
+
+
+### Testing
+
+Run all tests:
+
+    python test.py
+
+Run single test module:
+
+    python -m unittest tests.api_tests
+
+Run single test case:
+
+    python -m unittest tests.api_tests.ApiTestCase
+
+Run single test method:
+
+    python -m unittest tests.api_tests.ApiTestCase.test_data_service_permission
