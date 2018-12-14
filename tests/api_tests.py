@@ -73,6 +73,10 @@ class ApiTestCase(unittest.TestCase):
         self.assertIsInstance(json_data['permissions'], dict,
                               "Permissions are not a dict")
 
+    def check_layer_field_permission(self, layers_permissions):
+        self.assertIn('edit_points', layers_permissions.keys())
+        self.assertIn('name', layers_permissions['edit_points'])
+
     def test_ogc_service_permissions(self):
         status_code, json_data = self.get(
             '/ogc?ows_type=WMS&ows_name=qwc_demo')
@@ -80,3 +84,12 @@ class ApiTestCase(unittest.TestCase):
         self.assertIn('permissions', json_data)
         self.assertIsInstance(json_data['permissions'], dict,
                               "Permissions are not a dict")
+        permissions = json_data['permissions']
+        self.assertEqual(permissions['qgs_project'], 'qwc_demo')
+        self.assertEqual(['qwc_demo', 'edit_demo', 'edit_points', 'edit_lines',
+                          'edit_polygons', 'geographic_lines', 'country_names',
+                          'states_provinces', 'countries', 'osm_bg',
+                          'bluemarble_bg'],
+                         permissions['public_layers'])
+        self.check_layer_field_permission(permissions['layers'])
+        self.assertEqual(permissions['print_templates'], ['A4 Landscape'])

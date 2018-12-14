@@ -50,12 +50,22 @@ class OGCServicePermission(PermissionQuery):
 
         # get complete OGC service permissions from GetProjectSettings
         permissions = self.parseProjectSettings(ows_name, ows_type)
+        if not permissions:
+            return permissions
 
-        if permissions:
-            # filter by restricted resources
-            permissions = self.filter_restricted_resources(
-                ows_name, permissions, username, group, session
-            )
+        default_allow = True
+
+        permissions, map_id = self.filter_map_permissions(
+            default_allow, ows_name, permissions, username, group, session
+        )
+        if map_id is None:
+            return permissions
+        permissions = self.filter_layer_permissions(
+            default_allow, map_id, permissions, username, group, session
+        )
+        permissions = self.filter_print_template_permissions(
+            default_allow, map_id, permissions, username, group, session
+        )
 
         return permissions
 
@@ -186,11 +196,12 @@ class OGCServicePermission(PermissionQuery):
 
         permissions['layers'][layer_name] = attributes
 
-    def filter_restricted_resources(self, ows_name, permissions, username,
-                                    group, session):
-        """Filter restricted resources from OGC service permissions.
+    def filter_map_permissions(self, default_allow,
+                               ows_name, permissions, username,
+                               group, session):
+        """Filter permitted resources from OGC service permissions.
 
-        Return filtered OGC service permissions.
+        Return filtered OGC service permissions and map_id.
 
         :param str ows_name: Map name
         :param obj permissions: OGC service permissions
@@ -201,36 +212,46 @@ class OGCServicePermission(PermissionQuery):
         Permission = self.config_models.model('permissions')
         Resource = self.config_models.model('resources')
 
-        # query map restrictions
-        maps_query = self.resource_restrictions_query(
-                'map', username, group, session
-            ).filter(Resource.type == 'map').filter(Resource.name == ows_name)
+        if default_allow:
+            # query map restrictions
+            maps_query = self.resource_restrictions_query(
+                    'map', username, group, session
+                ).filter(Resource.type == 'map').filter(Resource.name == ows_name)
 
-        if maps_query.count() > 0:
-            # map not permitted
-            return {}
+            if maps_query.count() > 0:
+                # map not permitted
+                return {}, None
 
-        # query map permissions
-        map_id = None
-        maps_query = self.user_permissions_query(username, group, session). \
-            join(Permission.resource).filter(Resource.type == 'map'). \
-            filter(Resource.name == ows_name)
-        for map_permission in maps_query.all():
-            map_id = map_permission.resource.id
+            # query map permissions
+            map_id = None
+            maps_query = self.user_permissions_query(username, group, session). \
+                join(Permission.resource).filter(Resource.type == 'map'). \
+                filter(Resource.name == ows_name)
+            for map_permission in maps_query.all():
+                map_id = map_permission.resource.id
 
-        if map_id is None:
-            # map not restricted
             # NOTE: map without resource record is public by default
-            return permissions
+            return permissions, map_id
+        else:  # not default_allow
+            return {}, None  # TODO
 
-        # query layer restrictions
-        layers_query = self.resource_restrictions_query(
-                'layer', username, group, session
-            ).filter(Resource.parent_id == map_id)
+    def filter_layer_permissions(self, default_allow,
+                                 map_id, permissions, username,
+                                 group, session):
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
 
-        # remove restricted layers
-        for layer in layers_query.all():
-            self.filter_restricted_layer(layer.name, permissions)
+        if default_allow:
+            # query layer restrictions
+            layers_query = self.resource_restrictions_query(
+                    'layer', username, group, session
+                ).filter(Resource.parent_id == map_id)
+
+            # remove restricted layers
+            for layer in layers_query.all():
+                self.filter_restricted_layer(layer.name, permissions)
+        else:  # not default_allow
+            return {}  # TODO
 
         # query attribute restrictions
         layer_alias = aliased(Resource)
@@ -264,20 +285,31 @@ class OGCServicePermission(PermissionQuery):
                     if attr in layer_attrs:
                         layer_attrs.remove(attr)
 
-        # query print template restrictions
-        templates_query = self.resource_restrictions_query(
-                'print_template', username, group, session
-            ).filter(Resource.parent_id == map_id)
-
-        # remove restricted print templates
-        for template in templates_query.all():
-            if template.name in permissions['print_templates']:
-                permissions['print_templates'].remove(template.name)
-
-        # remove group_layers
-        permissions.pop('group_layers', None)
-
         return permissions
+
+    def filter_print_template_permissions(
+            self, default_allow, map_id, permissions, username, group,
+            session):
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
+
+        if default_allow:
+            # query print template restrictions
+            templates_query = self.resource_restrictions_query(
+                    'print_template', username, group, session
+                ).filter(Resource.parent_id == map_id)
+
+            # remove restricted print templates
+            for template in templates_query.all():
+                if template.name in permissions['print_templates']:
+                    permissions['print_templates'].remove(template.name)
+
+            # remove group_layers
+            permissions.pop('group_layers', None)
+
+            return permissions
+        else:  # not default_allow
+            return {}  # TODO
 
     def filter_restricted_layer(self, restricted_layer, permissions):
         """Recursively remove restricted layers.
