@@ -179,16 +179,30 @@ class QWC2ViewerPermission(PermissionQuery):
 
         # query writable data permissions
         edit_datasets = []
+        data_resource_types = [
+            'data',
+            'data_create', 'data_update', 'data_delete'
+        ]
         data_query = self.user_permissions_query(username, group, session). \
-            join(Permission.resource).filter(Resource.type == 'data'). \
-            filter(Permission.write). \
+            join(Permission.resource). \
+            filter(Resource.type.in_(data_resource_types)). \
             filter(Resource.parent_id == map_id)
         for data_permission in data_query.all():
-            edit_datasets.append(data_permission.resource.name)
+            if (
+                data_permission.resource.type == 'data'
+                and not data_permission.write
+            ):
+                # skip read-only 'data'
+                continue
+
+            # collect distinct datasets
+            if data_permission.resource.name not in edit_datasets:
+                edit_datasets.append(data_permission.resource.name)
 
         return edit_datasets
 
-    def edit_layer_config(self, map_name, layer_name, username, group, session):
+    def edit_layer_config(self, map_name, layer_name, username, group,
+                          session):
         """Get permitted edit config for a dataset.
 
         :param str map_name: Map name
@@ -217,6 +231,25 @@ class QWC2ViewerPermission(PermissionQuery):
             )
             return {}
 
+        # write permission
+        writable = permissions.get('writable', False)
+        # CRUD permissions
+        creatable = permissions.get('creatable', writable)
+        readable = permissions.get('readable', True)
+        updatable = permissions.get('updatable', writable)
+        deletable = permissions.get('deletable', writable)
+
+        # update and delete require readable for selection in viewer
+        updatable = updatable and readable
+        deletable = deletable and readable
+
+        if not creatable and not readable:
+            # dataset can neither be created nor selected
+            return {}
+
+        # set attributes to read-only if only deletable
+        read_only_attrs = not creatable and not updatable
+
         fields = []
         for attr in permissions['attributes']:
             field = permissions['fields'].get(attr, {})
@@ -236,6 +269,11 @@ class QWC2ViewerPermission(PermissionQuery):
                 edit_field['constraints'] = field['constraints']
                 if 'values' in field['constraints']:
                     edit_field['type'] = 'list'
+
+            if read_only_attrs:
+                # set read-only constraint
+                edit_field['constraints'] = edit_field.get('constraints', {})
+                edit_field['constraints']['readOnly'] = True
 
             fields.append(edit_field)
 
