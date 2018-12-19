@@ -60,7 +60,11 @@ class DataServicePermission(PermissionQuery):
             if permissions:
                 permissions.update({
                     'dataset': dataset,
-                    'writable': data_permissions['writable']
+                    'writable': data_permissions['writable'],
+                    'creatable': data_permissions['creatable'],
+                    'readable': data_permissions['readable'],
+                    'updatable': data_permissions['updatable'],
+                    'deletable': data_permissions['deletable']
                 })
 
                 self.filter_restricted_attributes(
@@ -74,7 +78,8 @@ class DataServicePermission(PermissionQuery):
 
     def data_permissions(self, map_name, layer_name, username, group, session):
         """Query resource permissions and return whether map and data layer are
-        permitted and writable, and any restricted attributes.
+        permitted and writable (with CRUD permissions), and any restricted
+        attributes.
 
         If map_name is None, the data permission with highest priority is used.
 
@@ -90,9 +95,14 @@ class DataServicePermission(PermissionQuery):
         map_id = None
         if map_name is None:
             # find map for data layer name
+            data_resource_types = [
+                'data',
+                'data_create', 'data_read', 'data_update', 'data_delete'
+            ]
             data_query = self.user_permissions_query(
                     username, group, session
-                ).join(Permission.resource).filter(Resource.type == 'data'). \
+                ).join(Permission.resource). \
+                filter(Resource.type.in_(data_resource_types)). \
                 filter(Resource.name == layer_name). \
                 order_by(Permission.priority.desc()). \
                 distinct(Permission.priority)
@@ -128,18 +138,31 @@ class DataServicePermission(PermissionQuery):
         # query data permissions
         permitted = False
         writable = False
+        creatable = False
+        readable = False
+        updatable = False
+        deletable = False
         restricted_attributes = []
-        data_query = self.user_permissions_query(username, group, session). \
-            join(Permission.resource).filter(Resource.type == 'data'). \
+
+        # NOTE: use permission with highest priority
+        base_query = self.user_permissions_query(username, group, session). \
+            join(Permission.resource). \
             filter(Resource.parent_id == map_id). \
             filter(Resource.name == layer_name). \
             order_by(Permission.priority.desc()). \
             distinct(Permission.priority)
-        # use data permission with highest priority
+
+        # query 'data' permission
+        data_query = base_query.filter(Resource.type == 'data')
         data_permission = data_query.first()
         if data_permission is not None:
+            # 'data' permitted
             permitted = True
             writable = data_permission.write
+            creatable = writable
+            readable = True
+            updatable = writable
+            deletable = writable
 
             # query attribute restrictions
             attrs_query = self.resource_restrictions_query(
@@ -148,10 +171,33 @@ class DataServicePermission(PermissionQuery):
             for attr in attrs_query.all():
                 restricted_attributes.append(attr.name)
 
+        else:
+            # query detailed CRUD data permissions
+            create_query = base_query.filter(Resource.type == 'data_create')
+            creatable = create_query.first() is not None
+
+            read_query = base_query.filter(Resource.type == 'data_read')
+            readable = read_query.first() is not None
+
+            update_query = base_query.filter(Resource.type == 'data_update')
+            updatable = update_query.first() is not None
+
+            delete_query = base_query.filter(Resource.type == 'data_delete')
+            deletable = delete_query.first() is not None
+
+            permitted = creatable or readable or updatable or deletable
+            writable = creatable and readable and updatable and deletable
+
+            # TODO: restricted attributes
+
         return {
             'map_name': map_name,
             'permitted': permitted,
             'writable': writable,
+            'creatable': creatable,
+            'readable': readable,
+            'updatable': updatable,
+            'deletable': deletable,
             'restricted_attributes': restricted_attributes
         }
 
