@@ -28,7 +28,7 @@ class OGCServicePermission(PermissionQuery):
         # get internal QGIS server URL from ENV
         # (default: local qgis-server container)
         self.qgis_server_url = os.environ.get('QGIS_SERVER_URL',
-                                              'http://localhost/wms/').rstrip('/') + '/'
+                                              'http://localhost:8001/ows/').rstrip('/') + '/'
 
     def permissions(self, params, username, group, session):
         """Query permissions for OGC service.
