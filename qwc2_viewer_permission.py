@@ -43,11 +43,12 @@ class QWC2ViewerPermission(PermissionQuery):
     }
 
     def __init__(self, ogc_permission_handler, data_permission_handler,
-                 config_models, logger):
+                 default_allow, config_models, logger):
         """Constructor
 
         :param ogc_permission_handler: Permission handler for OGC service
         :param data_permission_handler: Permission handler for Data service
+        :param bool default_allow: Whether resources are allowed by default
         :param ConfigModels config_models: Helper for ORM models
         :param Logger logger: Application logger
         """
@@ -55,6 +56,7 @@ class QWC2ViewerPermission(PermissionQuery):
 
         self.ogc_permission_handler = ogc_permission_handler
         self.data_permission_handler = data_permission_handler
+        self.default_allow = default_allow
 
         # get path to QWC2 themes config from ENV
         qwc2_path = os.environ.get('QWC2_PATH', 'qwc2/')
@@ -91,6 +93,11 @@ class QWC2ViewerPermission(PermissionQuery):
 
         # add viewer permissions
         result['viewers'] = self.viewer_permissions(username, group, session)
+
+        # add viewer task permissions
+        result['viewer_tasks'] = self.viewer_task_permissions(
+            username, group, session
+        )
 
         return result
 
@@ -307,3 +314,43 @@ class QWC2ViewerPermission(PermissionQuery):
             viewers.append(permission.resource.name)
 
         return viewers
+
+    def viewer_task_permissions(self, username, group, session):
+        """Get permitted viewer tasks.
+
+        :param str username: User name
+        :param str group: Group name
+        :param Session session: DB session
+        """
+        Permission = self.config_models.model('permissions')
+        Resource = self.config_models.model('resources')
+
+        # query viewer permissions
+        viewer_tasks = {}
+
+        # collect permittable viewer tasks
+        permittable_tasks_query = session.query(Resource). \
+            filter(Resource.type == 'viewer_task'). \
+            distinct(Resource.name)
+        permittable_tasks = [r.name for r in permittable_tasks_query.all()]
+
+        if self.default_allow:
+            # query viewer task restrictions
+            viewer_tasks_query = self.resource_restrictions_query(
+                'viewer_task', username, group, session
+            )
+            restricted_tasks = [r.name for r in viewer_tasks_query.all()]
+
+            for task in permittable_tasks:
+                viewer_tasks[task] = task not in restricted_tasks
+        else:
+            # query viewer task permissions
+            viewer_tasks_query = self.resource_permission_query(
+                'viewer_task', username, group, session
+            )
+            permitted_tasks = [r.name for r in viewer_tasks_query.all()]
+
+            for task in permittable_tasks:
+                viewer_tasks[task] = task in permitted_tasks
+
+        return viewer_tasks

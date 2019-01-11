@@ -33,7 +33,7 @@ class ConfigService:
         )
         qwc_permission_handler = QWC2ViewerPermission(
             ogc_permission_handler, data_permission_handler,
-            self.config_models, logger
+            default_allow, self.config_models, logger
         )
         self.permission_handlers = {
             'data': data_permission_handler,
