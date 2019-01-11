@@ -237,11 +237,13 @@ class OGCServicePermission(PermissionQuery):
                 return {}, None
 
         # get map_id
+        map_id = None
         maps_query = self.resource_permission_query(
                 'map', username, group, session
             ).filter(Resource.name == ows_name)
         map_permission = maps_query.first()
-        map_id = map_permission.id
+        if map_permission is not None:
+            map_id = map_permission.id
 
         return permissions, map_id
 
