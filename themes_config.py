@@ -113,6 +113,21 @@ def wmsName(url):
     return wms_name
 
 
+def uniqueThemeId(theme_name, config):
+    # generate unique theme id from theme name
+    used_theme_ids = config.get('usedThemeIds', [])
+    if theme_name in used_theme_ids:
+        # add suffix to name
+        suffix = 1
+        while "%s_%d" % (theme_name, suffix) in used_theme_ids:
+            suffix += 1
+        theme_name = "%s_%d" % (theme_name, suffix)
+    # else keep original name
+
+    used_theme_ids.append(theme_name)
+    return theme_name
+
+
 def getChildElement(parent, path):
     for part in path.split("/"):
         for node in parent.childNodes:
@@ -321,7 +336,7 @@ def getTheme(config, permissions, configItem, result, resultItem):
 
         # update theme config
         resultItem["url"] = urlPath(configItem["url"])
-        resultItem["id"] = str(uuid.uuid1())
+        resultItem["id"] = uniqueThemeId(wmsName(configItem["url"]), config)
         resultItem["name"] = getChildElementValue(topLayer, "Name")
         resultItem["title"] = wmsTitle
         resultItem["attribution"] = {
@@ -485,6 +500,10 @@ def genThemes(themesConfig, permissions=None):
             "defaultWMSVersion": config["defaultWMSVersion"] if "defaultWMSVersion" in config else None
             }
     }
+
+    # store used theme ids
+    config['usedThemeIds'] = []
+
     getGroupThemes(config, permissions, config["themes"], result, result["themes"])
 
     if "backgroundLayers" in result["themes"]:
