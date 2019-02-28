@@ -417,6 +417,9 @@ def getTheme(config, permissions, configItem, result, resultItem):
         if "allowReorderingLayers" in configItem:
             resultItem["allowReorderingLayers"] = configItem["allowReorderingLayers"]
 
+        if "mapTips" in configItem:
+            resultItem["mapTips"] = configItem["mapTips"]
+
         if project_permissions.get('edit_config'):
             # edit config from permissions
             resultItem["editConfig"] = project_permissions.get('edit_config')
