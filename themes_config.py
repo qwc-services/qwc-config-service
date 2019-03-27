@@ -158,9 +158,14 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
     if permissions is not None and level > 1 and name not in permissions['public_layers']:
         return  # omit layer
 
-    if name in printLayers:
-        # skip print layers
-        return
+    # skip print layers
+    for printLayer in printLayers:
+        if type(printLayer) is list:
+            for entry in printLayer:
+                if entry["name"] == name:
+                    return
+        elif printLayer == name:
+            return
 
     layerEntry = {"name": name, "title": title}
 
