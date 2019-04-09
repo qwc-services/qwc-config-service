@@ -136,9 +136,11 @@ class QWC2ViewerPermission(PermissionQuery):
                         permissions[wms_name]['edit_config'] = edit_config
 
         groups = group_config.get('groups', [])
-        for group in groups:
+        for sub_group in groups:
             # collect sub group permissions
-            self.themes_group_permissions(group, permissions, username, group)
+            self.themes_group_permissions(
+                sub_group, permissions, username, group, session
+            )
 
     def edit_permissions(self, map_name, username, group, session):
         """Query edit permissions for a theme.
