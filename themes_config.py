@@ -425,6 +425,9 @@ def getTheme(config, permissions, configItem, result, resultItem):
         if "mapTips" in configItem:
             resultItem["mapTips"] = configItem["mapTips"]
 
+        if "userMap" in configItem:
+            resultItem["userMap"] = configItem["userMap"]
+
         if project_permissions.get('edit_config'):
             # edit config from permissions
             resultItem["editConfig"] = project_permissions.get('edit_config')
