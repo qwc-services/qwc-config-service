@@ -174,10 +174,12 @@ class OGCServicePermission(PermissionQuery):
         else:
             layer_name = fallback_name
 
+        layer_title_tag = layer.find('%sTitle' % np, ns)
+
         permissions['public_layers'].append(layer_name)
-        if layer.get('queryable') == '1':
+        if layer.get('queryable') == '1' and layer_title_tag:
             permissions['queryable_layers'].append(layer_name)
-            layer_title = layer.find('%sTitle' % np, ns).text
+            layer_title = layer_title_tag.text
             permissions['feature_info_aliases'][layer_title] = layer_name
 
         # collect sub layers if group layer
