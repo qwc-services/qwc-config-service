@@ -177,7 +177,7 @@ class OGCServicePermission(PermissionQuery):
         layer_title_tag = layer.find('%sTitle' % np, ns)
 
         permissions['public_layers'].append(layer_name)
-        if layer.get('queryable') == '1' and layer_title_tag:
+        if layer.get('queryable') == '1' and layer_title_tag is not None:
             permissions['queryable_layers'].append(layer_name)
             layer_title = layer_title_tag.text
             permissions['feature_info_aliases'][layer_title] = layer_name
