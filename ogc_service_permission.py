@@ -30,6 +30,8 @@ class OGCServicePermission(PermissionQuery):
         self.qgis_server_url = os.environ.get('QGIS_SERVER_URL',
                                               'http://localhost:8001/ows/').rstrip('/') + '/'
 
+        self.project_settings_cache = {}
+
     def permissions(self, params, username, group, session):
         """Query permissions for OGC service.
 
@@ -75,6 +77,16 @@ class OGCServicePermission(PermissionQuery):
 
         return permissions
 
+    def themesConfigMTime(self):
+        qwc2_path = os.environ.get('QWC2_PATH', 'qwc2/')
+        themes_config_path = os.environ.get(
+            'QWC2_THEMES_CONFIG', os.path.join(qwc2_path, 'themesConfig.json')
+        )
+
+        if os.path.isfile(themes_config_path):
+            return os.path.getmtime(themes_config_path)
+        return -1
+
     def parseProjectSettings(self, ows_name, ows_type):
         """Get complete OGC service permissions from GetProjectSettings.
 
@@ -85,22 +97,43 @@ class OGCServicePermission(PermissionQuery):
         """
         permissions = {}
 
-        # get GetProjectSettings
-        response = requests.get(
-            urljoin(self.qgis_server_url, ows_name),
-            params={
-                'SERVICE': ows_type,
-                'VERSION': '1.3.0',
-                'REQUEST': 'GetProjectSettings'
-            },
-            timeout=30
-        )
-
-        if response.status_code != requests.codes.ok:
-            self.logger.warn(
-                "Could not get GetProjectSettings: %s", response.content
+        cache = os.environ.get("__QWC_CONFIG_SERVICE_PROJECT_SETTINGS_CACHE", "0") == "1"
+        if cache and \
+           ows_type in self.project_settings_cache and \
+           ows_name in self.project_settings_cache[ows_type] and \
+           self.project_settings_cache[ows_type][ows_name]["timestamp"] != -1 and \
+           self.project_settings_cache[ows_type][ows_name]["timestamp"] >= self.themesConfigMTime():
+            document = self.project_settings_cache[ows_type][ows_name]["document"]
+        else:
+            # get GetProjectSettings
+            response = requests.get(
+                urljoin(self.qgis_server_url, ows_name),
+                params={
+                    'SERVICE': ows_type,
+                    'VERSION': '1.3.0',
+                    'REQUEST': 'GetProjectSettings'
+                },
+                timeout=30
             )
-            return permissions
+
+            if response.status_code != requests.codes.ok:
+                self.logger.warn(
+                    "Could not get GetProjectSettings: %s", response.content
+                )
+                return permissions
+
+            document = response.content
+
+            if cache:
+                if not ows_type in self.project_settings_cache:
+                    self.project_settings_cache[ows_type] = {}
+                if not ows_name in self.project_settings_cache[ows_type]:
+                    self.project_settings_cache[ows_type][ows_name] = {}
+                self.project_settings_cache[ows_type][ows_name] = {
+                    "document": document,
+                    "timestamp": self.themesConfigMTime()
+                }
+
 
         # parse GetProjectSettings XML
         ElementTree.register_namespace('', 'http://www.opengis.net/wms')
@@ -109,7 +142,7 @@ class OGCServicePermission(PermissionQuery):
         ElementTree.register_namespace(
             'xlink', 'http://www.w3.org/1999/xlink'
         )
-        root = ElementTree.fromstring(response.content)
+        root = ElementTree.fromstring(document)
 
         # use default namespace for XML search
         # namespace dict
