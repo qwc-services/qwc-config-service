@@ -419,8 +419,8 @@ def getTheme(config, permissions, configItem, result, resultItem):
         if "skipEmptyFeatureAttributes" in configItem:
             resultItem["skipEmptyFeatureAttributes"] = configItem["skipEmptyFeatureAttributes"]
 
-        if "allowReorderingLayers" in configItem:
-            resultItem["allowReorderingLayers"] = configItem["allowReorderingLayers"]
+        if "config" in configItem:
+            resultItem["config"] = configItem["config"]
 
         if "mapTips" in configItem:
             resultItem["mapTips"] = configItem["mapTips"]
