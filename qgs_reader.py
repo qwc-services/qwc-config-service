@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 class QGSReader:
     """QGSReader class
 
-    Read QGIS 2.18 projects and extract data for QWC config.
+    Read QGIS 2.18 or 3.x projects and extract data for QWC config.
     """
 
     def __init__(self, logger):
@@ -16,6 +16,7 @@ class QGSReader:
         """
         self.logger = logger
         self.root = None
+        self.qgis_version = 0
 
         # get path to QGIS projects from ENV
         self.qgs_resources_path = os.environ.get('QGIS_RESOURCES_PATH', 'qgs/')
@@ -38,6 +39,13 @@ class QGSReader:
             if self.root.tag != 'qgis':
                 self.logger.warn("'%s' is not a QGS file" % qgs_path)
                 return False
+
+            # extract QGIS version
+            version = self.root.get('version')
+            major, minor, rev = [
+                int(v) for v in version.split('-')[0].split('.')
+            ]
+            self.qgis_version = major * 10000 + minor * 100 + rev
 
         except Exception as e:
             self.logger.error(e)
@@ -172,9 +180,8 @@ class QGSReader:
         aliases = maplayer.find('aliases')
         for alias in aliases.findall('alias'):
             field = alias.get('field')
-            edittype = maplayer.find("edittypes/edittype[@name='%s']" % field)
 
-            if edittype.get('widgetv2type') == 'Hidden':
+            if self.field_hidden(maplayer, field):
                 # skip hidden fields
                 continue
 
@@ -187,7 +194,7 @@ class QGSReader:
                 fields[field]['alias'] = name
 
             # get any constraints from edit widgets
-            constraints = self.edit_widget_constraints(edittype)
+            constraints = self.edit_widget_constraints(maplayer, field)
             if constraints:
                 fields[field]['constraints'] = constraints
 
@@ -196,18 +203,32 @@ class QGSReader:
             'fields': fields
         }
 
-    def edit_widget_constraints(self, edittype):
+    def edit_widget_constraints(self, maplayer, field):
         """Get any constraints from edit widget config.
 
-        :param Element edittype: QGS edittype node
+        :param Element maplayer: QGS maplayer node
+        :param str field: Field name
+        """
+        if self.qgis_version > 30000:
+            return self.edit_widget_constraints_v3(maplayer, field)
+        else:
+            return self.edit_widget_constraints_v2(maplayer, field)
+
+    def edit_widget_constraints_v2(self, maplayer, field):
+        """Get any constraints from edit widget config (QGIS 2.18).
+
+        :param Element maplayer: QGS maplayer node
+        :param str field: Field name
         """
         constraints = {}
 
+        edittype = maplayer.find("edittypes/edittype[@name='%s']" % field)
         widget_config = edittype.find('widgetv2config')
         if widget_config.get('fieldEditable') == '0':
             constraints['readonly'] = True
 
-        if widget_config.get('notNull') == '1':
+        if (not constraints.get('readonly', False) and
+                widget_config.get('notNull') == '1'):
             constraints['required'] = True
 
         constraint_desc = widget_config.get('constraintDescription', '')
@@ -218,7 +239,7 @@ class QGSReader:
             constraints.update({
                 'min': widget_config.get('Min'),
                 'max': widget_config.get('Max'),
-                'step': widget_config.get('Step'),
+                'step': widget_config.get('Step')
             })
         elif edittype.get('widgetv2type') == 'ValueMap':
             values = []
@@ -232,3 +253,74 @@ class QGSReader:
                 constraints['values'] = values
 
         return constraints
+
+    def edit_widget_constraints_v3(self, maplayer, field):
+        """Get any constraints from edit widget config (QGIS 3.x).
+
+        :param Element maplayer: QGS maplayer node
+        :param str field: Field name
+        """
+        constraints = {}
+
+        # NOTE: <editable /> is empty if Attributes Form is not configured
+        editable_field = maplayer.find("editable/field[@name='%s']" % field)
+        if (editable_field is not None and
+                editable_field.get('editable') == '0'):
+            constraints['readonly'] = True
+
+        if not constraints.get('readonly', False):
+            # ConstraintNotNull = 1
+            constraints['required'] = int(
+                maplayer.find("constraints/constraint[@field='%s']" % field)
+                .get('constraints')
+            ) & 1 > 0
+
+        constraint_desc = maplayer.find(
+            "constraintExpressions/constraint[@field='%s']" % field
+        ).get('desc')
+        if len(constraint_desc) > 0:
+            constraints['placeholder'] = constraint_desc
+
+        edit_widget = maplayer.find(
+            "fieldConfiguration/field[@name='%s']/editWidget" % field
+        )
+
+        if edit_widget.get('type') == 'Range':
+            constraints.update({
+                'min': edit_widget.find(
+                    "config/Option/Option[@name='Min']").get('value'),
+                'max': edit_widget.find(
+                    "config/Option/Option[@name='Max']").get('value'),
+                'step': edit_widget.find(
+                    "config/Option/Option[@name='Step']").get('value')
+            })
+        elif edit_widget.get('type') == 'ValueMap':
+            values = []
+            for option_map in edit_widget.findall(
+                    "config/Option/Option[@type='List']/Option"
+            ):
+                option = option_map.find("Option")
+                values.append({
+                    'label': option.get('name'),
+                    'value': option.get('value')
+                })
+
+            if values:
+                constraints['values'] = values
+
+        return constraints
+
+    def field_hidden(self, maplayer, field):
+        """Return whether field is hidden.
+
+        :param Element maplayer: QGS maplayer node
+        :param str field: Field name
+        """
+        if self.qgis_version > 30000:
+            edit_widget = maplayer.find(
+                "fieldConfiguration/field[@name='%s']/editWidget" % field
+            )
+            return edit_widget.get('type') == 'Hidden'
+        else:
+            edittype = maplayer.find("edittypes/edittype[@name='%s']" % field)
+            return edittype.get('widgetv2type') == 'Hidden'
