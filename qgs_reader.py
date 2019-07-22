@@ -237,9 +237,9 @@ class QGSReader:
 
         if edittype.get('widgetv2type') == 'Range':
             constraints.update({
-                'min': widget_config.get('Min'),
-                'max': widget_config.get('Max'),
-                'step': widget_config.get('Step')
+                'min': self.parse_number(widget_config.get('Min')),
+                'max': self.parse_number(widget_config.get('Max')),
+                'step': self.parse_number(widget_config.get('Step'))
             })
         elif edittype.get('widgetv2type') == 'ValueMap':
             values = []
@@ -287,12 +287,15 @@ class QGSReader:
 
         if edit_widget.get('type') == 'Range':
             constraints.update({
-                'min': edit_widget.find(
-                    "config/Option/Option[@name='Min']").get('value'),
-                'max': edit_widget.find(
-                    "config/Option/Option[@name='Max']").get('value'),
-                'step': edit_widget.find(
-                    "config/Option/Option[@name='Step']").get('value')
+                'min': self.parse_number(
+                    edit_widget.find(
+                        "config/Option/Option[@name='Min']").get('value')),
+                'max': self.parse_number(
+                    edit_widget.find(
+                        "config/Option/Option[@name='Max']").get('value')),
+                'step': self.parse_number(
+                    edit_widget.find(
+                        "config/Option/Option[@name='Step']").get('value'))
             })
         elif edit_widget.get('type') == 'ValueMap':
             values = []
@@ -324,3 +327,22 @@ class QGSReader:
         else:
             edittype = maplayer.find("edittypes/edittype[@name='%s']" % field)
             return edittype.get('widgetv2type') == 'Hidden'
+
+    def parse_number(self, value):
+        """Parse string as int or float, or return string if neither.
+
+        :param str value: Number value as string
+        """
+        result = value
+
+        try:
+            result = int(value)
+        except ValueError:
+            # int conversion failed
+            try:
+                result = float(value)
+            except ValueError:
+                # float conversion failed
+                pass
+
+        return result
