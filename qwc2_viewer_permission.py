@@ -228,6 +228,14 @@ class QWC2ViewerPermission(PermissionQuery):
             data_params, username, group, session
         )
 
+        if not permissions:
+            # data permissions are empty
+            self.logger.warn(
+                "Could not get data permissions for edit dataset '%s'" %
+                dataset
+            )
+            return {}
+
         if permissions['geometry_type'] not in self.EDIT_GEOM_TYPES:
             # unsupported geometry type
             table = "%s.%s" % (
