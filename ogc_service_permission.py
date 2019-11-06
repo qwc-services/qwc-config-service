@@ -443,3 +443,54 @@ class OGCServicePermission(PermissionQuery):
 
         # update restricted_group_layers
         permissions['restricted_group_layers'] = {}  # TODO
+
+    def collect_theme_urls(self, themes, theme_urls):
+        if "items" in themes:
+            for entry in themes["items"]:
+                theme_urls.add(entry["url"])
+        if "groups" in themes:
+            for theme_group in themes["groups"]:
+                self.collect_theme_urls(theme_group, theme_urls)
+
+    def cache_project_settings(self):
+        qwc2_path = os.environ.get('QWC2_PATH', 'qwc2/')
+        themes_config_path = os.environ.get(
+            'QWC2_THEMES_CONFIG', os.path.join(qwc2_path, 'themesConfig.json')
+        )
+        mtime = self.themesConfigMTime()
+
+        with open(themes_config_path) as fh:
+            data = json.load(fh)
+        # Collect themes
+        theme_urls = set()
+        themes = data["themes"] if "themes" in data else {}
+        self.collect_theme_urls(themes, theme_urls)
+
+        if not "WMS" in self.project_settings_cache:
+            self.project_settings_cache["WMS"] = {}
+
+        cached = []
+        for url in theme_urls:
+            if not url.startswith(self.qgis_server_url):
+                self.logger.warn("Not caching external WMS: %s" % url)
+                continue
+
+            ows_name = url[len(self.qgis_server_url):]
+            response = requests.get(
+                urljoin(self.qgis_server_url, ows_name),
+                params={
+                    'SERVICE': "WMS",
+                    'VERSION': '1.3.0',
+                    'REQUEST': 'GetProjectSettings'
+                },
+                timeout=30
+            )
+
+            if response.status_code == requests.codes.ok:
+                self.logger.info("Cached project settings for %s" % ows_name)
+                self.project_settings_cache["WMS"][ows_name] = {
+                    "document": response.content,
+                    "timestamp": mtime
+                }
+                cached.append(ows_name)
+        return {"cached_settings": cached}

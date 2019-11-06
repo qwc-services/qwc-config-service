@@ -51,6 +51,9 @@ class ConfigService:
             'QWC2_THEMES_CONFIG', os.path.join(qwc2_path, 'themesConfig.json')
         )
 
+        if os.environ.get("__QWC_CONFIG_SERVICE_PROJECT_SETTINGS_STARTUP_CACHE", "0") == "1":
+            self.cache_project_settings()
+
     def last_update(self):
         """Return UTC timestamp of last permissions update."""
         # get modification time of QWC2 themes config file
@@ -157,3 +160,6 @@ class ConfigService:
         return {
             'restrictions': restrictions
         }
+
+    def cache_project_settings(self):
+        return self.permission_handlers["ogc"].cache_project_settings()

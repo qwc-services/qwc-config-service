@@ -27,6 +27,14 @@ last_update_response = create_model(api, 'LastUpdate', [
     )]
 ])
 
+cache_project_settings_response = create_model(api, 'CacheProjectSettings', [
+    ['cached_settings', fields.Raw(
+        required=True,
+        description='List of service names for which settings were cached',
+        example=['name1', 'name2']
+    )]
+])
+
 resource_permissions_response = create_model(api, 'Resource permissions', [
     ['resource_type', fields.String(required=True, description='Resource type',
                                     example='map')],
@@ -65,6 +73,13 @@ class LastUpdate(Resource):
         """Get timestamp of last permissions update"""
         return config_service.last_update()
 
+@api.route('/cache_project_settings')
+class CacheProjectSettings(Resource):
+    @api.doc('cache_project_settings')
+    @api.marshal_with(cache_project_settings_response)
+    def get(self):
+        """Cache all known project settings"""
+        return config_service.cache_project_settings()
 
 @api.route('/permissions/<resource_type>')
 @api.param('resource_type', 'Resource type (e.g. <i>map</i>, <i>layer</i>)',
