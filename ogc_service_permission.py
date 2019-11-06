@@ -129,8 +129,6 @@ class OGCServicePermission(PermissionQuery):
             if cache:
                 if not ows_type in self.project_settings_cache:
                     self.project_settings_cache[ows_type] = {}
-                if not ows_name in self.project_settings_cache[ows_type]:
-                    self.project_settings_cache[ows_type][ows_name] = {}
                 self.project_settings_cache[ows_type][ows_name] = {
                     "document": document,
                     "timestamp": self.themesConfigMTime()
