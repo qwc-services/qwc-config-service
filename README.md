@@ -61,7 +61,7 @@ The `write` flag is only used for `data` resources and sets whether a data layer
 Based on the user's identity (user name and/or group name), all corresponding roles and their permissions and restrictions are collected.
 The service configurations are then modified according to these permissions and restrictions.
 
-Using the `DEFAULT_ALLOW` environment variable, some resources can be set to be permitted or restricted by default if no permissions are set (default: `False`). Affected resources are `map`, `layer`, `print_template` and `viewer_task`.
+Using the `DEFAULT_ALLOW` environment variable, some resources can be set to be permitted or restricted by default if no permissions are set (default: `True`). Affected resources are `map`, `layer`, `print_template` and `viewer_task`.
 
 e.g. `DEFAULT_ALLOW=True`: all maps and layers are permitted by default
 e.g. `DEFAULT_ALLOW=False`: maps and layers are only available if their resources and permissions are explicitly configured
@@ -125,6 +125,7 @@ Set the `QGIS_RESOURCES_PATH` environment variable to your QGIS project files pa
 
 Set the `QWC2_PATH` environment variable to your QWC2 files path.
 Set the `QWC2_THEMES_CONFIG` environment variable to your QWC2 `themesConfig.json` path if it is not located in `$QWC2_PATH`.
+Set the `QWC2_VIEWERS_PATH` environment variable to your QWC2 custom viewers path (default: `$QWC2_PATH/viewers/`) (see [Custom viewer configurations](https://github.com/qwc-services/qwc-map-viewer#custom-viewer-configurations)).
 
 Base URL:
 

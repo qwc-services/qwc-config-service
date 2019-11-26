@@ -1,5 +1,5 @@
 import os
-from flask import json
+from flask import json, safe_join
 from werkzeug.urls import url_parse
 
 from permission_query import PermissionQuery
@@ -64,6 +64,11 @@ class QWC2ViewerPermission(PermissionQuery):
             'QWC2_THEMES_CONFIG', os.path.join(qwc2_path, 'themesConfig.json')
         )
 
+        # get path for custom viewer themes configs from ENV
+        self.viewers_path = os.environ.get(
+            'QWC2_VIEWERS_PATH', os.path.join(qwc2_path, 'viewers')
+        )
+
         # get internal QGIS server URL from ENV
         qgis_server_url = os.environ.get('QGIS_SERVER_URL',
                                          'http://localhost/wms/').rstrip('/') + '/'
@@ -79,9 +84,42 @@ class QWC2ViewerPermission(PermissionQuery):
         :param str group: Group name
         :param Session session: DB session
         '''
+        viewer = params.get('viewer')
+
+        # get viewer permissions
+        viewer_permissions = self.viewer_permissions(username, group, session)
+
         # get themes from QWC2 themes config
-        with open(self.themes_config_path, encoding='utf-8') as fh:
-            config = json.load(fh)
+        themes_config_path = None
+        config = None
+        if viewer and viewer in viewer_permissions:
+            # try to load custom viewer themes config '<viewer>.json'
+            filename = '%s.json' % viewer
+            themes_config_path = safe_join(self.viewers_path, '%s' % filename)
+            try:
+                self.logger.debug(
+                    "Using custom viewer themes config '%s'" % filename
+                )
+                with open(themes_config_path, encoding='utf-8') as fh:
+                    config = json.load(fh)
+            except Exception as e:
+                self.logger.error(
+                    "Could not load custom viewer themes config '%s':\n%s" %
+                    (filename, e)
+                )
+                # fallback to default themes config
+
+        if config is None:
+            # load default themes config
+            try:
+                themes_config_path = self.themes_config_path
+                with open(themes_config_path, encoding='utf-8') as fh:
+                    config = json.load(fh)
+            except Exception as e:
+                self.logger.error(
+                    "Could not load default themes config:\n%s" % e
+                )
+                return jsonify({"error": "Unable to read themesConfig.json"})
 
         # query WMS permissions for each theme
         permissions = {}
@@ -89,10 +127,10 @@ class QWC2ViewerPermission(PermissionQuery):
             config.get('themes', {}), permissions, username, group, session
         )
 
-        result = genThemes(self.themes_config_path, permissions)
+        result = genThemes(themes_config_path, permissions)
 
         # add viewer permissions
-        result['viewers'] = self.viewer_permissions(username, group, session)
+        result['viewers'] = viewer_permissions
 
         # add viewer task permissions
         result['viewer_tasks'] = self.viewer_task_permissions(
