@@ -43,7 +43,7 @@ class QWC2ViewerPermission(PermissionQuery):
     }
 
     def __init__(self, ogc_permission_handler, data_permission_handler,
-                 default_allow, config_models, logger):
+                 default_allow, config_models, logger, project_settings_cache):
         """Constructor
 
         :param ogc_permission_handler: Permission handler for OGC service
@@ -73,6 +73,7 @@ class QWC2ViewerPermission(PermissionQuery):
         qgis_server_url = os.environ.get('QGIS_SERVER_URL',
                                          'http://localhost/wms/').rstrip('/') + '/'
         self.qgis_server_base_path = url_parse(qgis_server_url).path
+        self.project_settings_cache = project_settings_cache
 
     def permissions(self, params, username, group, session):
         '''Query permissions for QWC service.
@@ -127,7 +128,7 @@ class QWC2ViewerPermission(PermissionQuery):
             config.get('themes', {}), permissions, username, group, session
         )
 
-        result = genThemes(themes_config_path, permissions)
+        result = genThemes(themes_config_path, permissions, self.project_settings_cache)
 
         # add viewer permissions
         result['viewers'] = viewer_permissions

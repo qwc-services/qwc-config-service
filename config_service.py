@@ -28,12 +28,14 @@ class ConfigService:
         data_permission_handler = DataServicePermission(
             self.db_engine, self.config_models, logger
         )
+        self.project_settings_cache = {}
         ogc_permission_handler = OGCServicePermission(
-            default_allow, self.config_models, logger
+            default_allow, self.config_models, logger, self.project_settings_cache
         )
         qwc_permission_handler = QWC2ViewerPermission(
             ogc_permission_handler, data_permission_handler,
-            default_allow, self.config_models, logger
+            default_allow, self.config_models, logger,
+            self.project_settings_cache
         )
         self.permission_handlers = {
             'data': data_permission_handler,
