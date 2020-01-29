@@ -463,9 +463,6 @@ class OGCServicePermission(PermissionQuery):
         themes = data["themes"] if "themes" in data else {}
         self.collect_theme_urls(themes, theme_urls)
 
-        if not "WMS" in self.project_settings_cache:
-            self.project_settings_cache["WMS"] = {}
-
         cached = []
         for url in theme_urls:
             if not url.startswith(self.qgis_server_url):
@@ -485,8 +482,19 @@ class OGCServicePermission(PermissionQuery):
 
             if response.status_code == requests.codes.ok:
                 self.logger.info("Cached project settings for %s" % ows_name)
-                self.project_settings_cache["WMS"][ows_name] = {
-                    "document": response.content,
+                document = response.content
+
+                # parse GetProjectSettings XML
+                ElementTree.register_namespace('', 'http://www.opengis.net/wms')
+                ElementTree.register_namespace('qgs', 'http://www.qgis.org/wms')
+                ElementTree.register_namespace('sld', 'http://www.opengis.net/sld')
+                ElementTree.register_namespace(
+                    'xlink', 'http://www.w3.org/1999/xlink'
+                )
+                root = ElementTree.fromstring(document)
+
+                self.project_settings_cache[url] = {
+                    "document": root,
                     "timestamp": mtime
                 }
                 cached.append(ows_name)
