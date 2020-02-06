@@ -148,7 +148,9 @@ def getChildElementValue(parent, path):
 
 
 # recursively get layer tree
-def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, level, collapseBelowLevel, titleNameMap, featureReports):
+def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers,
+                 level, collapseBelowLevel, titleNameMap, featureReports,
+                 searchLayers):
     name = getChildElementValue(layer, "Name")
     title = getChildElementValue(layer, "Title")
     layers = getDirectChildElements(layer, "Layer")
@@ -183,7 +185,8 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
         layerEntry["queryable"] = layer.getAttribute("queryable") == "1"
         if layerEntry["queryable"] and layer.getAttribute("displayField"):
             layerEntry["displayField"] = layer.getAttribute("displayField")
-
+        if name in searchLayers:
+            layerEntry["searchterms"] = [searchLayers[name]]
         try:
             onlineResource = getChildElement(layer, "Attribution/OnlineResource")
             layerEntry["attribution"] = {
@@ -243,7 +246,10 @@ def getLayerTree(layer, permissions, resultLayers, visibleLayers, printLayers, l
         layerEntry["sublayers"] = []
         layerEntry["expanded"] = False if collapseBelowLevel >= 0 and level >= collapseBelowLevel else True
         for sublayer in layers:
-            getLayerTree(sublayer, permissions, layerEntry["sublayers"], visibleLayers, printLayers, level + 1, collapseBelowLevel, titleNameMap, featureReports)
+            getLayerTree(sublayer, permissions, layerEntry["sublayers"],
+                         visibleLayers, printLayers, level + 1,
+                         collapseBelowLevel, titleNameMap, featureReports,
+                         searchLayers)
 
         if not layerEntry["sublayers"]:
             # skip empty groups
@@ -295,8 +301,15 @@ def getTheme(config, permissions, configItem, result, resultItem):
         visibleLayers = []
         titleNameMap = {}
         featureReports = configItem["featureReport"] if "featureReport" in configItem else {}
+        searchLayers = {}
+        if "searchProviders" in configItem:
+            solr = [p for p in configItem["searchProviders"] if
+                    "provider" in p and p["provider"] == "solr"]
+            if len(solr) == 1:
+                searchLayers = solr[0]["layers"]
         getLayerTree(topLayer, project_permissions, layerTree, visibleLayers,
-                     printLayers, 1, collapseLayerGroupsBelowLevel, titleNameMap, featureReports)
+                     printLayers, 1, collapseLayerGroupsBelowLevel,
+                     titleNameMap, featureReports, searchLayers)
         visibleLayers.reverse()
 
         # print templates
