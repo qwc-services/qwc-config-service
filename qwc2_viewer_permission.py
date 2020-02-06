@@ -119,7 +119,7 @@ class QWC2ViewerPermission(PermissionQuery):
                 self.logger.error(
                     "Could not load default themes config:\n%s" % e
                 )
-                return jsonify({"error": "Unable to read themesConfig.json"})
+                return {"error": "Unable to read themesConfig.json"}
 
         # query WMS permissions for each theme
         permissions = {}
