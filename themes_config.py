@@ -405,6 +405,16 @@ def getTheme(config, permissions, configItem, result, resultItem):
         # NOTE: skip root WMS layer
         resultItem["sublayers"] = layerTree[0]["sublayers"] if len(layerTree) > 0 and "sublayers" in layerTree[0] else []
         resultItem["expanded"] = True
+
+        # external layers
+        if "externalLayers" in configItem:
+            # filter by permissions
+            resultItem["externalLayers"] = [
+                externalLayer for externalLayer in configItem["externalLayers"]
+                if externalLayer.get('internalLayer')
+                in project_permissions['public_layers']
+            ]
+
         if "backgroundLayers" in configItem:
             resultItem["backgroundLayers"] = configItem["backgroundLayers"]
         resultItem["searchProviders"] = configItem["searchProviders"] if "searchProviders" in configItem else []
@@ -523,6 +533,7 @@ def genThemes(themesConfig, permissions=None):
             "defaultPrintScales": config["defaultPrintScales"] if "defaultPrintScales" in config else None,
             "defaultPrintResolutions": config["defaultPrintResolutions"] if "defaultPrintResolutions" in config else None,
             "defaultPrintGrid": config["defaultPrintGrid"] if "defaultPrintGrid" in config else None,
+            "externalLayers": config["themes"]["externalLayers"] if "externalLayers" in config["themes"] else [],
             "backgroundLayers": list(map(reformatAttribution, config["themes"]["backgroundLayers"])),
             "defaultWMSVersion": config["defaultWMSVersion"] if "defaultWMSVersion" in config else None
             }
@@ -540,6 +551,22 @@ def genThemes(themesConfig, permissions=None):
             if not os.path.isfile(qwc2_path + "/assets/" + imgPath):
                 imgPath = "img/mapthumbs/default.jpg"
             backgroundLayer["thumbnail"] = imgPath
+
+    if "externalLayers" in result["themes"]:
+        # collect used external layer names
+        external_layers = []
+        for item in result["themes"]["items"]:
+            for layer in item.get('externalLayers', []):
+                external_layers.append(layer.get('name'))
+
+        # unique external layer names
+        external_layers = set(external_layers)
+
+        # filter unused and restricted external layers
+        result["themes"]["externalLayers"] = [
+            layer for layer in result["themes"]["externalLayers"]
+            if layer.get('name') in external_layers
+        ]
 
     return result
 
