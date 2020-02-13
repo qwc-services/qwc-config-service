@@ -279,7 +279,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
         return
 
     cache = os.environ.get("__QWC_CONFIG_SERVICE_PROJECT_SETTINGS_CACHE", "0") == "1"
-    ows_url = configItem["url"]
+    ows_url = urljoin(baseUrl, configItem["url"])
 
     if cache and \
         ows_url in project_settings_cache and \
