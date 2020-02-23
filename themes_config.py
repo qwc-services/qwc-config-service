@@ -567,7 +567,7 @@ def getGroupThemes(config, permissions, configGroup, result, resultGroup, projec
                 "items": [],
                 "subdirs": []
             }
-            getGroupThemes(config, permissions, group, result, groupEntry)
+            getGroupThemes(config, permissions, group, result, groupEntry, project_settings_cache)
             resultGroup["subdirs"].append(groupEntry)
 
 
