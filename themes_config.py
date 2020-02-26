@@ -486,6 +486,8 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
             in project_permissions['public_layers']
         ]
 
+    if "pluginData" in configItem:
+        resultItem["pluginData"] = configItem["pluginData"]
     if "backgroundLayers" in configItem:
         resultItem["backgroundLayers"] = configItem["backgroundLayers"]
     resultItem["searchProviders"] = configItem["searchProviders"] if "searchProviders" in configItem else []
@@ -598,6 +600,7 @@ def genThemes(themesConfig, permissions=None, project_settings_cache=None):
             "defaultPrintScales": config["defaultPrintScales"] if "defaultPrintScales" in config else None,
             "defaultPrintResolutions": config["defaultPrintResolutions"] if "defaultPrintResolutions" in config else None,
             "defaultPrintGrid": config["defaultPrintGrid"] if "defaultPrintGrid" in config else None,
+            "pluginData": config["themes"]["pluginData"] if "pluginData" in config["themes"] else [],
             "externalLayers": config["themes"]["externalLayers"] if "externalLayers" in config["themes"] else [],
             "backgroundLayers": list(map(reformatAttribution, config["themes"]["backgroundLayers"])),
             "defaultWMSVersion": config["defaultWMSVersion"] if "defaultWMSVersion" in config else None
