@@ -378,7 +378,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
         solr = [p for p in configItem["searchProviders"] if
                 "provider" in p and p["provider"] == "solr"]
         if len(solr) == 1:
-            searchLayers = solr[0]["layers"]
+            searchLayers = solr[0].get("layers", {})
     getLayerTree(topLayer, project_permissions, layerTree, visibleLayers,
                  printLayers, 1, collapseLayerGroupsBelowLevel, titleNameMap, featureReports, searchLayers, np, ns)
     visibleLayers.reverse()
