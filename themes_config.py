@@ -573,6 +573,23 @@ def getGroupThemes(config, permissions, configGroup, result, resultGroup, projec
             resultGroup["subdirs"].append(groupEntry)
 
 
+def collectExternalLayers(itemsGroup):
+    """Recursively collect used external layer names.
+
+    :param obj itemsGroup: Theme items group (themes|subdirs)
+    """
+    external_layers = []
+    for item in itemsGroup["items"]:
+        for layer in item.get('externalLayers', []):
+            external_layers.append(layer.get('name'))
+
+    if "subdirs" in itemsGroup:
+        for group in itemsGroup["subdirs"]:
+            external_layers += collectExternalLayers(group)
+
+    return external_layers
+
+
 def reformatAttribution(entry):
     entry["attribution"] = {
         "Title": entry["attribution"] if "attribution" in entry else None,
@@ -622,11 +639,7 @@ def genThemes(themesConfig, permissions=None, project_settings_cache=None):
 
     if "externalLayers" in result["themes"]:
         # collect used external layer names
-        external_layers = []
-        for item in result["themes"]["items"]:
-            for layer in item.get('externalLayers', []):
-                external_layers.append(layer.get('name'))
-
+        external_layers = collectExternalLayers(result["themes"])
         # unique external layer names
         external_layers = set(external_layers)
 
