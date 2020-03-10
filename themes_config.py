@@ -435,6 +435,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
         "Title": configItem["attribution"],
         "OnlineResource": configItem["attributionUrl"]
     }
+    resultItem["abstract"] = getChildElementValue(capabilities, "Service/Abstract")
     resultItem["keywords"] = ", ".join(keywords)
     resultItem["wms_name"] = wmsName(configItem["url"])
     if "format" in configItem:
