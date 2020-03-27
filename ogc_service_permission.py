@@ -99,7 +99,6 @@ class OGCServicePermission(PermissionQuery):
 
         ows_url = urljoin(self.qgis_server_url, ows_name)
         cache = os.environ.get("__QWC_CONFIG_SERVICE_PROJECT_SETTINGS_CACHE", "0") == "1"
-        self.logger.info("**** %s ****" % ("CACHE" if cache else "NOCACHE"))
         if cache and \
            ows_url in self.project_settings_cache and \
            self.project_settings_cache[ows_url]["timestamp"] != -1 and \
