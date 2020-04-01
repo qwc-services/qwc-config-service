@@ -558,7 +558,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
 
 
 # recursively get themes for groups
-def getGroupThemes(config, permissions, configGroup, result, resultGroup, project_settings_cache):
+def getGroupThemes(config, permissions, configGroup, result, resultGroup, project_settings_cache, groupCounter):
     for item in configGroup["items"]:
         itemEntry = {}
         getTheme(config, permissions, item, result, itemEntry, project_settings_cache)
@@ -567,12 +567,14 @@ def getGroupThemes(config, permissions, configGroup, result, resultGroup, projec
 
     if "groups" in configGroup:
         for group in configGroup["groups"]:
+            groupCounter += 1
             groupEntry = {
+                "id": "g%d" % groupCounter,
                 "title": group["title"],
                 "items": [],
                 "subdirs": []
             }
-            getGroupThemes(config, permissions, group, result, groupEntry, project_settings_cache)
+            getGroupThemes(config, permissions, group, result, groupEntry, project_settings_cache, groupCounter)
             resultGroup["subdirs"].append(groupEntry)
 
 
@@ -631,7 +633,8 @@ def genThemes(themesConfig, permissions=None, project_settings_cache=None):
     # store used theme ids
     config['usedThemeIds'] = []
 
-    getGroupThemes(config, permissions, config["themes"], result, result["themes"], project_settings_cache)
+    groupCounter = 0
+    getGroupThemes(config, permissions, config["themes"], result, result["themes"], project_settings_cache, groupCounter)
 
     if "backgroundLayers" in result["themes"]:
         # get thumbnails for background layers
