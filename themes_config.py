@@ -431,6 +431,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
     resultItem["id"] = uniqueThemeId(wmsName(configItem["url"]), config)
     resultItem["name"] = getChildElementValue(topLayer, [np['ns'] + "Name"], ns)
     resultItem["title"] = wmsTitle
+    resultItem["description"] = configItem["description"] if "description" in configItem else ""
     resultItem["attribution"] = {
         "Title": configItem["attribution"],
         "OnlineResource": configItem["attributionUrl"]
