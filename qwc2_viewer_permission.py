@@ -275,7 +275,7 @@ class QWC2ViewerPermission(PermissionQuery):
             )
             return {}
 
-        if permissions['geometry_type'] not in self.EDIT_GEOM_TYPES:
+        if permissions.get('geometry_type', None) not in self.EDIT_GEOM_TYPES:
             # unsupported geometry type
             table = "%s.%s" % (
                 permissions.get('schema'), permissions.get('table_name')
@@ -283,7 +283,7 @@ class QWC2ViewerPermission(PermissionQuery):
             self.logger.warn(
                 "Unsupported geometry type '%s' for edit dataset '%s' "
                 "on table '%s'" %
-                (permissions['geometry_type'], dataset, table)
+                (permissions.get('geometry_type', None), dataset, table)
             )
             return {}
 
