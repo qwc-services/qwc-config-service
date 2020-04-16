@@ -154,6 +154,13 @@ class QGSReader:
             metadata['table_name'] = parts[1]
 
             metadata['geometry_column'] = m.group(2)
+        else:
+            m = re.search(r'table="(.+?)" \w+=', datasource)
+            if m is not None:
+                table = m.group(1)
+                parts = table.split('"."')
+                metadata['schema'] = parts[0]
+                metadata['table_name'] = parts[1]
 
         m = re.search(r"key='(.+?)' \w+=", datasource)
         if m is not None:
