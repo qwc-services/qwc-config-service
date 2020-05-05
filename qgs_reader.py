@@ -293,16 +293,19 @@ class QGSReader:
         )
 
         if edit_widget.get('type') == 'Range':
+            min_option = edit_widget.find(
+                        "config/Option/Option[@name='Min']")
+            max_option = edit_widget.find(
+                        "config/Option/Option[@name='Max']")
+            step_option = edit_widget.find(
+                        "config/Option/Option[@name='Step']")
             constraints.update({
                 'min': self.parse_number(
-                    edit_widget.find(
-                        "config/Option/Option[@name='Min']").get('value')),
+                    min_option.get('value')) if min_option else -2147483648,
                 'max': self.parse_number(
-                    edit_widget.find(
-                        "config/Option/Option[@name='Max']").get('value')),
+                    max_option.get('value')) if max_option else 2147483647,
                 'step': self.parse_number(
-                    edit_widget.find(
-                        "config/Option/Option[@name='Step']").get('value'))
+                    step_option.get('value')) if step_option else 1
             })
         elif edit_widget.get('type') == 'ValueMap':
             values = []
