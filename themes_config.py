@@ -29,7 +29,6 @@ from werkzeug.urls import url_parse
 # get internal QGIS server URL from ENV
 baseUrl = os.environ.get('QGIS_SERVER_URL', 'http://localhost/wms').rstrip('/') + '/'
 qwc2_path = os.environ.get("QWC2_PATH", "qwc2").rstrip("/")
-themesConfig = os.environ.get("QWC2_THEMES_CONFIG", "themesConfig.json")
 
 # load thumbnail from file or GetMap
 def getThumbnail(configItem, resultItem, layers, crs, extent):
@@ -77,7 +76,7 @@ def getThumbnail(configItem, resultItem, layers, crs, extent):
         resultItem["thumbnail"] = "img/mapthumbs/default.jpg"
         traceback.print_exc()
 
-def getEditConfig(editConfig):
+def getEditConfig(editConfig, themesConfig):
     if not editConfig:
         return None
     elif os.path.isabs(editConfig) and os.path.exists(editConfig):
@@ -276,7 +275,7 @@ def themesConfigMTime():
     return -1
 
 # parse GetCapabilities for theme
-def getTheme(config, permissions, configItem, result, resultItem, project_settings_cache):
+def getTheme(config, permissions, configItem, result, resultItem, project_settings_cache, themesConfig):
 
     project_permissions = permissions.get(wmsName(configItem["url"])) if permissions is not None else None
     if not project_permissions:
@@ -536,7 +535,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
     if project_permissions.get('edit_config'):
         # edit config from permissions
         resultItem["editConfig"] = project_permissions.get('edit_config')
-        externalConfig = getEditConfig(configItem.get("editConfig", None))
+        externalConfig = getEditConfig(configItem.get("editConfig", None), themesConfig)
         if externalConfig:
             for layer in externalConfig:
                 form = externalConfig[layer].get("form", None)
@@ -545,7 +544,7 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
                     resultItem["editConfig"][layer] = externalConfig[layer]
     else:
         # get edit config from referenced JSON
-        resultItem["editConfig"] = getEditConfig(configItem["editConfig"] if "editConfig" in configItem else None)
+        resultItem["editConfig"] = getEditConfig(configItem["editConfig"] if "editConfig" in configItem else None, themesConfig)
 
     # set default theme
     if configItem.get('default', False) or not result["themes"]["defaultTheme"]:
@@ -571,10 +570,10 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
 
 
 # recursively get themes for groups
-def getGroupThemes(config, permissions, configGroup, result, resultGroup, project_settings_cache, groupCounter):
+def getGroupThemes(config, permissions, configGroup, result, resultGroup, project_settings_cache, groupCounter, themesConfig):
     for item in configGroup["items"]:
         itemEntry = {}
-        getTheme(config, permissions, item, result, itemEntry, project_settings_cache)
+        getTheme(config, permissions, item, result, itemEntry, project_settings_cache, themesConfig)
         if itemEntry:
             resultGroup["items"].append(itemEntry)
 
@@ -587,7 +586,7 @@ def getGroupThemes(config, permissions, configGroup, result, resultGroup, projec
                 "items": [],
                 "subdirs": []
             }
-            getGroupThemes(config, permissions, group, result, groupEntry, project_settings_cache, groupCounter)
+            getGroupThemes(config, permissions, group, result, groupEntry, project_settings_cache, groupCounter, themesConfig)
             resultGroup["subdirs"].append(groupEntry)
 
 
@@ -647,7 +646,7 @@ def genThemes(themesConfig, permissions=None, project_settings_cache=None):
     config['usedThemeIds'] = []
 
     groupCounter = 0
-    getGroupThemes(config, permissions, config["themes"], result, result["themes"], project_settings_cache, groupCounter)
+    getGroupThemes(config, permissions, config["themes"], result, result["themes"], project_settings_cache, groupCounter, themesConfig)
 
     if "backgroundLayers" in result["themes"]:
         # get thumbnails for background layers
