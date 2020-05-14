@@ -494,8 +494,10 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
 
     if "pluginData" in configItem:
         resultItem["pluginData"] = configItem["pluginData"]
-    if "minSearchScale" in configItem:
-        resultItem["minSearchScale"] = configItem["minSearchScale"]
+    if "minSearchScaleDenom" in configItem:
+            resultItem["minSearchScaleDenom"] = configItem["minSearchScaleDenom"]
+    elif "minSearchScale" in configItem: # Legacy name
+        resultItem["minSearchScaleDenom"] = configItem["minSearchScale"]
     if "themeInfoLinks" in configItem:
             resultItem["themeInfoLinks"] = configItem["themeInfoLinks"]
     if "backgroundLayers" in configItem:
