@@ -442,6 +442,15 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
     }
     resultItem["abstract"] = getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "Abstract"], ns)
     resultItem["keywords"] = ", ".join(keywords)
+    resultItem["onlineResource"] = getChildElement(capabilities, "Service/OnlineResource").getAttribute("xlink:href")
+    resultItem["contact"] = {
+        "person": getChildElementValue(capabilities, "Service/ContactInformation/ContactPersonPrimary/ContactPerson"),
+        "organization": getChildElementValue(capabilities, "Service/ContactInformation/ContactPersonPrimary/ContactOrganization"),
+        "position": getChildElementValue(capabilities, "Service/ContactInformation/ContactPosition"),
+        "phone": getChildElementValue(capabilities, "Service/ContactInformation/ContactVoiceTelephone"),
+        "email": getChildElementValue(capabilities, "Service/ContactInformation/ContactElectronicMailAddress")
+    }
+
     resultItem["wms_name"] = wmsName(configItem["url"])
     if "format" in configItem:
         resultItem["format"] = configItem["format"]
