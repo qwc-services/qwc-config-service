@@ -442,13 +442,13 @@ def getTheme(config, permissions, configItem, result, resultItem, project_settin
     }
     resultItem["abstract"] = getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "Abstract"], ns)
     resultItem["keywords"] = ", ".join(keywords)
-    resultItem["onlineResource"] = getChildElement(capabilities, "Service/OnlineResource").getAttribute("xlink:href")
+    resultItem["onlineResource"] = getAttributeNS(getChildElement(root, [np['ns'] + "Service", np['ns'] + "OnlineResource"], ns), 'href', 'xlink', ns)
     resultItem["contact"] = {
-        "person": getChildElementValue(capabilities, "Service/ContactInformation/ContactPersonPrimary/ContactPerson"),
-        "organization": getChildElementValue(capabilities, "Service/ContactInformation/ContactPersonPrimary/ContactOrganization"),
-        "position": getChildElementValue(capabilities, "Service/ContactInformation/ContactPosition"),
-        "phone": getChildElementValue(capabilities, "Service/ContactInformation/ContactVoiceTelephone"),
-        "email": getChildElementValue(capabilities, "Service/ContactInformation/ContactElectronicMailAddress")
+        "person": getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "ContactInformation", np['ns'] + "ContactPersonPrimary", np['ns'] + "ContactPerson"], ns),
+        "organization": getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "ContactInformation", np['ns'] + "ContactPersonPrimary", np['ns'] + "ContactOrganization"], ns),
+        "position": getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "ContactInformation", np['ns'] + "ContactPosition"], ns),
+        "phone": getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "ContactInformation", np['ns'] + "ContactVoiceTelephone"], ns),
+        "email": getChildElementValue(root, [np['ns'] + "Service", np['ns'] + "ContactInformation", np['ns'] + "ContactElectronicMailAddress"], ns)
     }
 
     resultItem["wms_name"] = wmsName(configItem["url"])
