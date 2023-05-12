@@ -1,3 +1,5 @@
+**NOTE** This service is obsolete and replaced by [qwc-config-generator](https://github.com/qwc-services/qwc-config-generator).
+
 QWC Config Service
 ==================
 
